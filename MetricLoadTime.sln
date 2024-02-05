@@ -1,0 +1,33 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34511.84
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MetricLoadTime.Server", "MetricLoadTime.Server\MetricLoadTime.Server.csproj", "{FAF202F6-A681-4BA8-8D2A-9C18427B91BA}"
+EndProject
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "metricloadtime.client", "metricloadtime.client\metricloadtime.client.esproj", "{91829F3B-D20D-41D7-865A-53BA8B8A2DAA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FAF202F6-A681-4BA8-8D2A-9C18427B91BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FAF202F6-A681-4BA8-8D2A-9C18427B91BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FAF202F6-A681-4BA8-8D2A-9C18427B91BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FAF202F6-A681-4BA8-8D2A-9C18427B91BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{91829F3B-D20D-41D7-865A-53BA8B8A2DAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{91829F3B-D20D-41D7-865A-53BA8B8A2DAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{91829F3B-D20D-41D7-865A-53BA8B8A2DAA}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{91829F3B-D20D-41D7-865A-53BA8B8A2DAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{91829F3B-D20D-41D7-865A-53BA8B8A2DAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{91829F3B-D20D-41D7-865A-53BA8B8A2DAA}.Release|Any CPU.Deploy.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {72DCACAC-91F9-44BC-B0DD-FE953715F813}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,47 @@
+import { useEffect, useState } from 'react';
+import './App.css';
+
+function App() {
+    const [result, setResult] = useState();
+    const [number1, setNumber1] = useState(0);
+    const [number2, setNumber2] = useState(0);
+
+    useEffect(() => {
+        calculate();
+    }, [number1, number2]);
+
+    async function calculate() {
+        // Make a GET request to your calculator API
+        const response = await fetch(`http://localhost:8002/api/calculator/add?number1=${number1}&number2=${number2}`);
+        console.log(response);
+        // Handle response
+        if (response.ok) {
+            const result = await response.json();
+            setResult(result);
+        } else {
+            setResult('Error occurred');
+        }
+    }
+
+    return (
+        <div>
+            <h1>Calculator</h1>
+            <div>
+                <label>Number 1:</label>
+                <input type="number" value={number1} onChange={e => setNumber1(parseInt(e.target.value))} />
+            </div>
+            <div>
+                <label>Number 2:</label>
+                <input type="number" value={number2} onChange={e => setNumber2(parseInt(e.target.value))} />
+            </div>
+            <div>
+                <button onClick={calculate}>Calculate</button>
+            </div>
+            <div>
+                <h2>Result: {result}</h2>
+            </div>
+        </div>
+    );
+}
+
+export default App;
