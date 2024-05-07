@@ -14,12 +14,12 @@ namespace MetricLoadTime.Server.Controllers
             return Ok(result);
         }
 
-        [HttpGet("sub")]
-        public IActionResult Sub(int number1, int number2)
-        {
-            int result = number1 - number2;
-            return Ok(result);
-        }
+        // [HttpGet("sub")]
+        // public IActionResult Sub(int number1, int number2)
+        // {
+        //     int result = number1 - number2;
+        //     return Ok(result);
+        // }
 
         // Add more methods for other operations like subtraction, multiplication, division, etc.
     }

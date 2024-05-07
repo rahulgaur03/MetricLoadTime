@@ -16,7 +16,7 @@ app.UseCors(policy =>
           .AllowAnyMethod();
 });
 
-await Electron.WindowManager.CreateWindowAsync();
+//await Electron.WindowManager.CreateWindowAsync();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 

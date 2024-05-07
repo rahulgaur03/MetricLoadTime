@@ -7,12 +7,25 @@ function App() {
     const [number2, setNumber2] = useState(0);
 
     useEffect(() => {
-        calculate();
+        Sub();
     }, [number1, number2]);
 
-    async function calculate() {
+    async function Add() {
         // Make a GET request to your calculator API
-        const response = await fetch(`http://localhost:8002/api/calculator/add?number1=${number1}&number2=${number2}`);
+        const response = await fetch(`api/calculator/add?number1=${number1}&number2=${number2}`);
+        console.log(response);
+        // Handle response
+        if (response.ok) {
+            const result = await response.json();
+            setResult(result);
+        } else {
+            setResult('Error occurred');
+        }
+    }
+
+    async function Sub() {
+        // Make a GET request to your calculator API
+        const response = await fetch(`query/adomd/sub?number1=${number1}&number2=${number2}`);
         console.log(response);
         // Handle response
         if (response.ok) {
@@ -35,7 +48,10 @@ function App() {
                 <input type="number" value={number2} onChange={e => setNumber2(parseInt(e.target.value))} />
             </div>
             <div>
-                <button onClick={calculate}>Calculate</button>
+                <button onClick={Add}>Add</button>
+            </div>
+            <div>
+                <button onClick={Sub}>Sub</button>
             </div>
             <div>
                 <h2>Result: {result}</h2>
