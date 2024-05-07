@@ -26,7 +26,7 @@ namespace MetricLoadTime.Server.Controllers
         private static int _runningFirstTime;
         private static string _extractPath;
         private static Dictionary<string, int> _columnCountProgressTracker = new Dictionary<string, int> { { "Total", 0 }, { "Progress", 0 } };
-
+        private static DataTable _reportData;
 
 
         [HttpGet("progress")]
@@ -74,7 +74,8 @@ namespace MetricLoadTime.Server.Controllers
                 new List<string> { "TableID", "ColumnName", "ColumnID" }
             );
 
-            GetFinalColumns(con, tableQuery, columnsQuery);
+            var finalColumns = GetFinalColumns(con, tableQuery, columnsQuery);
+            GetAllCombination(measureListSQLQuery, measureReferenceQuery, relationshipQuery, tableQuery, finalColumns, columnsQuery);
 
             return Ok(1);
         }
@@ -86,7 +87,7 @@ namespace MetricLoadTime.Server.Controllers
             _modelName = modelName;
             _thresholdValue = thresholdValue;
             _runningFirstTime = runningFirstTime;
-            GetReportData(filePath);
+            _reportData = GetReportData(filePath);
             return Ok(1);
         }
 
@@ -152,7 +153,7 @@ namespace MetricLoadTime.Server.Controllers
                     Debug.WriteLine(query);
 
                 }
-                _columnCountProgressTracker["Progress"] = i+1;
+                _columnCountProgressTracker["Progress"] = i + 1;
             }
             DataTable ColumnValuesCount = df;
             DataTable RowNumberPerDimension = ColumnValuesCount;
@@ -230,7 +231,7 @@ namespace MetricLoadTime.Server.Controllers
             return finalColumns;
         }
 
-        void GetReportData(string filePath)
+        DataTable GetReportData(string filePath)
         {
             // Extract ZIP file
             var extractPath = Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
@@ -321,7 +322,310 @@ namespace MetricLoadTime.Server.Controllers
             // Save DataTable to Excel
             CreateExcelSheet(dataTable, "dataTable.xlsx");
             Console.WriteLine("Created Array");
+            return dataTable;
         }
+
+
+        DataTable GetAllCombination(DataTable measureListSQLQuery, DataTable measureReferenceQuery, DataTable relationshipQuery, DataTable tableQuery, DataTable finalColumns, DataTable columnsQuery)
+        {
+            DataTable parsedDataFrame = _reportData;
+
+            DataTable MeasureTimeWithDimensions = new DataTable();
+
+            DataTable TempMeasureCalculationQuery = measureListSQLQuery;
+            DataTable MeasureReferences = measureReferenceQuery;
+            DataTable Relationships = relationshipQuery;
+            DataTable Tables = tableQuery;
+            DataTable FinalColumnsFromTables = finalColumns;
+            DataTable Columns = columnsQuery;
+
+            var tempMeasureCalculationQueryRows = TempMeasureCalculationQuery.AsEnumerable();
+            var measureReferencesRows = MeasureReferences.AsEnumerable();
+            var relationshipsRows = Relationships.AsEnumerable();
+            var tablesRows = Tables.AsEnumerable();
+            var finalColumnsFromTablesRows = FinalColumnsFromTables.AsEnumerable();
+            var columnsRows = Columns.AsEnumerable();
+
+            var query = from relationship in relationshipsRows
+                        join fromTable in tablesRows
+                            on relationship.Field<string>("FromTableID") equals fromTable.Field<string>("TableID")
+                        join toTable in tablesRows
+                            on relationship.Field<string>("ToTableID") equals toTable.Field<string>("TableID")
+                        join fromColumn in columnsRows
+                            on relationship.Field<string>("FromColumnID") equals fromColumn.Field<string>("ColumnID")
+                        join toColumn in columnsRows
+                            on relationship.Field<string>("ToColumnID") equals toColumn.Field<string>("ColumnID")
+                        join measureReference in measureReferencesRows
+                            on fromTable.Field<string>("TableName") equals measureReference.Field<string>("Referenced_Table")
+                        join tempMeasureCalculation in tempMeasureCalculationQueryRows
+                            on measureReference.Field<string>("Measure") equals tempMeasureCalculation.Field<string>("Measure")
+                        join finalColumnFromTable in finalColumnsFromTablesRows
+                            on toTable.Field<string>("TableName") equals finalColumnFromTable.Field<string>("TableName")
+                        select new
+                        {
+                            FromTableID = fromTable.Field<string>("TableID"),
+                            FromColumnID = fromColumn.Field<string>("ColumnID"),
+                            ToTableID = toTable.Field<string>("TableID"),
+                            ToColumnID = toColumn.Field<string>("ColumnID"),
+                            FromTableName = fromTable.Field<string>("TableName"),
+                            ToTableName = toTable.Field<string>("TableName"),
+                            FromColumnName = fromColumn.Field<string>("ColumnName"),
+                            ToColumnName = toColumn.Field<string>("ColumnName"),
+                            Measure = tempMeasureCalculation.Field<string>("Measure"),
+                            Referenced_Table = measureReference.Field<string>("Referenced_Table"),
+                            MeasureGroup = tempMeasureCalculation.Field<string>("MeasureGroup"),
+                            EXPRESSION = tempMeasureCalculation.Field<string>("EXPRESSION"),
+                            CubeName = tempMeasureCalculation.Field<string>("CubeName"),
+                            TableName = finalColumnFromTable.Field<string>("TableName"),
+                            ColumnName = finalColumnFromTable.Field<string>("ColumnName"),
+                            RowNumber = finalColumnFromTable.Field<string>("RowNumber"),
+                        };
+
+            DataTable MeasuresWithDimensions = ConvertToDataTable(query);
+
+            CreateExcelSheet(MeasuresWithDimensions, "MeasuresWithDimensions.xlsx");
+
+            MeasureTimeWithDimensions.Columns.Add("Measure", typeof(string));
+            MeasureTimeWithDimensions.Columns.Add("MeasureGroup", typeof(string));
+            MeasureTimeWithDimensions.Columns.Add("EXPRESSION", typeof(string));
+            MeasureTimeWithDimensions.Columns.Add("CubeName", typeof(string));
+            MeasureTimeWithDimensions.Columns.Add("ColumnName", typeof(string));
+            MeasureTimeWithDimensions.Columns.Add("DimensionName", typeof(string));
+            MeasureTimeWithDimensions.Columns.Add("Query", typeof(string));
+            MeasureTimeWithDimensions.Columns.Add("WithDimension", typeof(string));
+
+            foreach (DataRow row in MeasuresWithDimensions.Rows)
+            {
+                MeasureTimeWithDimensions.Rows.Add(
+                    row["Measure"],
+                    row["MeasureGroup"],
+                    row["EXPRESSION"],
+                    row["CubeName"],
+                    row["ColumnName"],
+                    row["ToTableName"],
+                    string.Equals(row["ColumnName"].ToString(), "NULL", StringComparison.OrdinalIgnoreCase) ? "" : $"SELECT [{row["Measure"]}] ON 0, NON EMPTY {{[{row["ToTableName"]}].[{row["ColumnName"]}].children}} ON 1 FROM [{row["CubeName"]}]",
+                    1
+                );
+            }
+            CreateExcelSheet(MeasureTimeWithDimensions, "MeasureTimeWithDimensions.xlsx");
+
+
+
+            MeasuresWithDimensions = MeasureTimeWithDimensions;
+
+
+            DataTable MeasureTimeWithoutDimensions = new DataTable();
+            DataTable TempMeasureCalculation = measureListSQLQuery;
+            MeasureTimeWithoutDimensions.Columns.Add("Measure", typeof(string));
+            MeasureTimeWithoutDimensions.Columns.Add("MeasureGroup", typeof(string));
+            MeasureTimeWithoutDimensions.Columns.Add("EXPRESSION", typeof(string));
+            MeasureTimeWithoutDimensions.Columns.Add("CubeName", typeof(string));
+            MeasureTimeWithoutDimensions.Columns.Add("Query", typeof(string));
+            MeasureTimeWithoutDimensions.Columns.Add("WithDimension", typeof(string));
+            MeasureTimeWithoutDimensions.Columns.Add("DimensionName", typeof(string));
+            MeasureTimeWithoutDimensions.Columns.Add("ColumnName", typeof(string));
+
+            foreach (DataRow row in TempMeasureCalculation.Rows)
+            {
+                MeasureTimeWithoutDimensions.Rows.Add(
+                row["Measure"],
+                row["MeasureGroup"],
+                row["EXPRESSION"],
+                row["CubeName"],
+                $"SELECT [Measures].[{row["Measure"]}] ON 0 FROM [{row["CubeName"]}]",
+                0,
+                DBNull.Value,
+                DBNull.Value
+                );
+
+            }
+            CreateExcelSheet(MeasureTimeWithoutDimensions, "MeasureTimeWithoutDimensions.xlsx");
+
+
+
+
+
+            DataTable MeasuresWithoutDimensions = MeasureTimeWithoutDimensions;
+
+            // Add columns with default values directly
+            MeasuresWithDimensions.Columns.Add("LoadTime", typeof(string)).DefaultValue = "x";
+            MeasuresWithDimensions.Columns.Add("isMeasureUsedInVisual", typeof(string)).DefaultValue = "0";
+            MeasuresWithDimensions.Columns.Add("PageName", typeof(string)).DefaultValue = "-";
+            MeasuresWithDimensions.Columns.Add("VisualName", typeof(string)).DefaultValue = "-";
+            MeasuresWithDimensions.Columns.Add("VisualTitle", typeof(string)).DefaultValue = "-";
+            MeasuresWithDimensions.Columns.Add("ReportName", typeof(string)).DefaultValue = "-";
+            MeasuresWithDimensions.Columns.Add("hasDimension", typeof(string)).DefaultValue = "1";
+
+            foreach (DataRow row in MeasuresWithDimensions.Rows)
+            {
+                row["LoadTime"] = "x";
+                row["isMeasureUsedInVisual"] = "0";
+                row["PageName"] = "-";
+                row["VisualName"] = "-";
+                row["VisualTitle"] = "-";
+                row["ReportName"] = "-";
+                row["hasDimension"] = "1";
+            }
+
+            MeasuresWithoutDimensions.Columns.Add("LoadTime", typeof(string)).DefaultValue = "x";
+            MeasuresWithoutDimensions.Columns.Add("isMeasureUsedInVisual", typeof(string)).DefaultValue = "0";
+            MeasuresWithoutDimensions.Columns.Add("PageName", typeof(string)).DefaultValue = "-";
+            MeasuresWithoutDimensions.Columns.Add("VisualName", typeof(string)).DefaultValue = "-";
+            MeasuresWithoutDimensions.Columns.Add("VisualTitle", typeof(string)).DefaultValue = "-";
+            MeasuresWithoutDimensions.Columns.Add("ReportName", typeof(string)).DefaultValue = "-";
+            MeasuresWithoutDimensions.Columns.Add("hasDimension", typeof(string)).DefaultValue = "0";
+
+            foreach (DataRow row in MeasuresWithoutDimensions.Rows)
+            {
+                row["LoadTime"] = "x";
+                row["isMeasureUsedInVisual"] = "0";
+                row["PageName"] = "-";
+                row["VisualName"] = "-";
+                row["VisualTitle"] = "-";
+                row["ReportName"] = "-";
+                row["hasDimension"] = "0";
+            }
+
+
+            // Set default values for parsedDataFrame
+            parsedDataFrame.Columns.Add("LoadTime", typeof(string));
+            parsedDataFrame.Columns.Add("isMeasureUsedInVisual", typeof(string));
+            parsedDataFrame.Columns.Add("hasDimension", typeof(string));
+            foreach (DataRow row in parsedDataFrame.Rows)
+            {
+                row["LoadTime"] = "x";
+                row["isMeasureUsedInVisual"] = "1";
+                row["hasDimension"] = "0";
+            }
+
+            // Rename columns and add Query column
+            parsedDataFrame.Columns["MeasureName"].ColumnName = "Measure";
+            parsedDataFrame.Columns.Add("Query", typeof(string)).DefaultValue = ""; ;
+
+            // Populate Query column based on column values
+            foreach (DataRow row in parsedDataFrame.Rows)
+            {
+                if (row["ColumnName"].ToString() == "")
+                {
+                    row["Query"] = $"SELECT [Measures].[{row["Measure"]}] ON 0 FROM [{MeasuresWithDimensions.Rows[0]["CubeName"]}]";
+                }
+                else
+                {
+                    row["Query"] = $"SELECT [Measures].[{row["Measure"]}] ON 0, NON EMPTY [{row["DimensionName"]}].[{row["ColumnName"]}].Children ON 1 FROM [{MeasuresWithDimensions.Rows[0]["CubeName"]}]";
+                }
+            }
+
+            // Group parsedDataFrame by Measure and select the first row of each group
+            DataTable tempDF = parsedDataFrame.AsEnumerable()
+                .GroupBy(r => r.Field<string>("Measure"))
+                .Select(g => g.First())
+                .CopyToDataTable();
+            CreateExcelSheet(tempDF, "tempDF.xlsx");
+
+
+            Console.WriteLine("Done till here.");
+
+
+
+            var leftQuery = (
+            from tempRow in tempDF.AsEnumerable()
+            join measuresRow in MeasuresWithoutDimensions.AsEnumerable()
+            on tempRow.Field<string>("Measure") equals measuresRow.Field<string>("Measure") into temp
+            from measuresRow in temp.DefaultIfEmpty()
+            where measuresRow == null
+            select new
+            {
+                Measure = tempRow?["Measure"],
+                ColumnName_x = tempRow?["ColumnName"],
+                DimensionName_x = tempRow?["DimensionName"],
+                ReportName_x = tempRow?["ReportName"],
+                hasDimension_x = tempRow?["hasDimension"],
+                MeasureGroup = measuresRow?["MeasureGroup"], // Add null-conditional operator here
+                EXPRESSION = measuresRow?["EXPRESSION"],
+                Query_y = measuresRow?["Query"],             // Add null-conditional operator here
+                WithDimension = measuresRow?["WithDimension"],// Add null-conditional operator here
+                DimensionName_y = measuresRow?["DimensionName"], // Add null-conditional operator here
+                ColumnName_y = measuresRow?["ColumnName"],   // Add null-conditional operator here
+                LoadTime_y = measuresRow?["LoadTime"],       // Add null-conditional operator here
+                ReportName_y = measuresRow?["ReportName"],   // Add null-conditional operator here
+                hasDimension_y = measuresRow?["hasDimension"] // Add null-conditional operator here
+            }
+        );
+            // Merge tempDF with MeasuresWithoutDimensions to find missing measures
+            var rightQuery = (
+            from measuresRow in MeasuresWithoutDimensions.AsEnumerable()
+            join tempRow in tempDF.AsEnumerable()
+            on measuresRow.Field<string>("Measure") equals tempRow.Field<string>("Measure") into temp
+            from tempRow in temp.DefaultIfEmpty()
+            where tempRow == null
+            select new
+            {
+                Measure = measuresRow?["Measure"],
+                ColumnName_x = tempRow?["ColumnName"],
+                DimensionName_x = tempRow?["DimensionName"],
+                ReportName_x = tempRow?["ReportName"],
+                hasDimension_x = tempRow?["hasDimension"],
+                MeasureGroup = measuresRow?["MeasureGroup"], // Add null-conditional operator here
+                EXPRESSION = measuresRow?["EXPRESSION"],
+                Query_y = measuresRow?["Query"],             // Add null-conditional operator here
+                WithDimension = measuresRow?["WithDimension"],// Add null-conditional operator here
+                DimensionName_y = measuresRow?["DimensionName"], // Add null-conditional operator here
+                ColumnName_y = measuresRow?["ColumnName"],   // Add null-conditional operator here
+                LoadTime_y = measuresRow?["LoadTime"],       // Add null-conditional operator here
+                ReportName_y = measuresRow?["ReportName"],   // Add null-conditional operator here
+                hasDimension_y = measuresRow?["hasDimension"]
+            }
+        );
+
+            var finalQuery = leftQuery.Union(rightQuery);
+            var mergedDF = ConvertToDataTable(finalQuery);
+
+            CreateExcelSheet(mergedDF, "mergedDF.xlsx");
+
+            mergedDF.Columns["LoadTime_y"].ColumnName = "LoadTime";
+            mergedDF.Columns["Query_y"].ColumnName = "Query";
+
+            // Add additional columns to the mergedDF DataTable
+            mergedDF.Columns.Add("isMeasureUsedInVisual", typeof(string));
+            mergedDF.Columns.Add("PageName", typeof(string));
+            mergedDF.Columns.Add("VisualName", typeof(string));
+            mergedDF.Columns.Add("VisualTitle", typeof(string));
+            mergedDF.Columns.Add("ColumnName", typeof(string));
+            mergedDF.Columns.Add("DimensionName", typeof(string));
+            mergedDF.Columns.Add("hasDimension", typeof(string));
+
+
+            // Assign default values to the additional columns in each row
+            foreach (DataRow row in mergedDF.Rows)
+            {
+                row["isMeasureUsedInVisual"] = "0";
+                row["PageName"] = "-";
+                row["VisualName"] = "-";
+                row["VisualTitle"] = "-";
+                row["ColumnName"] = "-";
+                row["DimensionName"] = "-";
+                row["hasDimension"] = "0";
+            }
+
+
+            // Concatenate parsedDataFrame, mergedDF, and MeasuresWithDimensions
+            var possibleCombinations = new DataTable();
+            possibleCombinations.Merge(parsedDataFrame);
+            possibleCombinations.Merge(mergedDF);
+            possibleCombinations.Merge(MeasuresWithDimensions);
+
+            // Select required columns from possibleCombinations
+            possibleCombinations = possibleCombinations.DefaultView.ToTable(false,
+                "Measure", "DimensionName", "ColumnName", "LoadTime", "isMeasureUsedInVisual",
+                "ReportName", "PageName", "VisualName", "VisualTitle", "Query", "hasDimension");
+
+
+            CreateExcelSheet(possibleCombinations, "possibleCombinations.xlsx");
+            return possibleCombinations;
+
+        }
+
+
         void CreateExcelSheet(DataTable dataTable, string ExcelName)
         {
             var excelFileName = Path.Combine(_extractPath, ExcelName);
