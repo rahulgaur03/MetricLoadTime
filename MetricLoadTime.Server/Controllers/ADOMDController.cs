@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System.IO;
 using System.Data;
 using System.Diagnostics;
 using Microsoft.AnalysisServices.AdomdClient;
@@ -9,10 +8,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using System.Collections;
-using DocumentFormat.OpenXml.Drawing.Diagrams;
-using System.Runtime.CompilerServices;
-
-
 
 namespace MetricLoadTime.Server.Controllers
 {
@@ -20,7 +15,8 @@ namespace MetricLoadTime.Server.Controllers
     [Route("api/[controller]")]
     public class ADOMDController : ControllerBase
     {
-        private static AdomdConnection _con = new AdomdConnection();
+
+        private readonly static AdomdConnection _con = new AdomdConnection();
         private static string _endPoint = "";
         private static string _modelName = "";
         private static float _thresholdValue = 0;
@@ -44,21 +40,8 @@ namespace MetricLoadTime.Server.Controllers
         [HttpGet("progress")]
         public IActionResult Progress(string userName, string pass)
         {
-            var checkforlocal = "Y";
-            var connectionstring = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=a5ba62db-5e27-4e63-ac65-04cc570e6f9d;Data Source=localhost:51651;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
-
-            if (checkforlocal == "Y" || checkforlocal == "y")
-            {
-                connectionstring = connectionstring;
-            }
-            else
-            {
-                // connectionstring = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
-                connectionstring = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + userName + ";PWD=" + pass + "";
-            }
-            _con.ConnectionString = connectionstring;
-            _con.Open();
-            _con.Close();
+            _con.ConnectionString = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=a5ba62db-5e27-4e63-ac65-04cc570e6f9d;Data Source=localhost:51651;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
+            // _con.ConnectionString= "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + userName + ";PWD=" + pass + "";
 
             var measureListSQLQuery = ExecuteDataTable(
                 "SELECT [MEASURE_NAME],[MEASUREGROUP_NAME],[EXPRESSION],[CUBE_NAME] FROM $SYSTEM.MDSCHEMA_MEASURES WHERE MEASURE_IS_VISIBLE AND MEASUREGROUP_NAME <> 'Reporting Filters' ORDER BY [MEASUREGROUP_NAME]",
@@ -109,8 +92,6 @@ namespace MetricLoadTime.Server.Controllers
             return Ok(jsonResult);
         }
 
-        
-
         [HttpGet("progressBar")]
         public IActionResult ProgressBar()
         {
@@ -121,7 +102,6 @@ namespace MetricLoadTime.Server.Controllers
 
             return Ok(response);
         }
-
 
         [HttpGet("getloadtime")]
         public IActionResult GetLoadTime()
@@ -149,7 +129,7 @@ namespace MetricLoadTime.Server.Controllers
         [HttpGet("reload")]
         public IActionResult Reload(int uniqueID, string query)
         {
-            double loadTime = GetQueryExecutionTime(query, uniqueID-1, _allCombinations);
+            double loadTime = GetQueryExecutionTime(query, uniqueID - 1, _allCombinations);
 
             return Ok(loadTime);
         }
@@ -163,16 +143,15 @@ namespace MetricLoadTime.Server.Controllers
 
             for (int i = 0; i < allQueries.Rows.Count; i++)
             {
-                string query = allQueries.Rows[i]["Query"].ToString(); // Assuming "Query" is the column name
+                string query = allQueries.Rows[i]["Query"].ToString();
                 int rowIndex = i;
-                GetQueryExecutionTime(query, rowIndex,allQueries);
+                GetQueryExecutionTime(query, rowIndex, allQueries);
                 //tasks.Add(Task.Run(() => GetQueryExecutionTime(query, thresholdValue, rowIndex, allQueries)));
             }
             //Task.WaitAll(tasks.ToArray());
 
             CreateExcelSheet(allQueries, "RES.xlsx");
         }
-
 
 
         double GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries)
@@ -214,7 +193,7 @@ namespace MetricLoadTime.Server.Controllers
                 queryExecutionTime = -1; // Error occurred
             }
             _con.Close();
-            Console.WriteLine("Query execution time:"+queryExecutionTime);
+            Console.WriteLine("Query execution time:" + queryExecutionTime);
             allQueries.Rows[rowIndex]["LoadTime"] = queryExecutionTime;
             return queryExecutionTime;
 
@@ -805,7 +784,7 @@ namespace MetricLoadTime.Server.Controllers
             DataTable dataTable = new DataTable();
             List<string> columnList = new List<string>();
 
-            Type itemType = null;
+            Type? itemType = null;
             foreach (var item in dataRows)
             {
                 itemType = item.GetType();
@@ -841,7 +820,6 @@ namespace MetricLoadTime.Server.Controllers
             return Ok(result);
         }
 
-        // Add more methods for other operations like subtraction, multiplication, division, etc.
     }
 
     public class ConnectionsValue

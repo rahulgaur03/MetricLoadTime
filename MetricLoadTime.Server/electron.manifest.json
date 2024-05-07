@@ -3,14 +3,14 @@
   "splashscreen": {
     "imageFile": ""
   },
-  "name": "MetricLoadTime.Server",
-  "author": "",
+  "name": "MetricLoadTime",
+  "author": "RahulGaur",
   "singleInstance": false,
   "environment": "Production",
   "build": {
     "appId": "com.MetricLoadTime.Server.app",
-    "productName": "MetricLoadTime.Server",
-    "copyright": "Copyright © 2020",
+    "productName": "MetricLoadTime",
+    "copyright": "Copyright © 2024",
     "buildVersion": "1.0.0",
     "compression": "maximum",
     "directories": {

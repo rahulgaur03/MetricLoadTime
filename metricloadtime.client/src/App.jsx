@@ -25,7 +25,7 @@ function App() {
 
     async function Sub() {
         // Make a GET request to your calculator API
-        const response = await fetch(`query/adomd/sub?number1=${number1}&number2=${number2}`);
+        const response = await fetch(`api/adomd/sub?number1=${number1}&number2=${number2}`);
         console.log(response);
         // Handle response
         if (response.ok) {
