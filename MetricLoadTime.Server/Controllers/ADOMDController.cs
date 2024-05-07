@@ -27,13 +27,24 @@ namespace MetricLoadTime.Server.Controllers
         private static string _extractPath;
         private static Dictionary<string, int> _columnCountProgressTracker = new Dictionary<string, int> { { "Total", 0 }, { "Progress", 0 } };
         private static DataTable _reportData;
+        private static DataTable _allCombinations;
 
+        [HttpGet("analyze")]
+        public IActionResult Analyze(string filePath, string modelName, string endPoint, float thresholdValue, int runningFirstTime)
+        {
+            _endPoint = endPoint;
+            _modelName = modelName;
+            _thresholdValue = thresholdValue;
+            _runningFirstTime = runningFirstTime;
+            _reportData = GetReportData(filePath);
+            return Ok(1);
+        }
 
         [HttpGet("progress")]
         public IActionResult Progress(string userName, string pass)
         {
             var checkforlocal = "N";
-            var connectionstring = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=b45e4eee-a93c-4fb8-a3a7-108c5ed3edb4;Data Source=localhost:52797;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
+            var connectionstring = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=a5ba62db-5e27-4e63-ac65-04cc570e6f9d;Data Source=localhost:51651;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
             var con = new AdomdConnection();
 
             if (checkforlocal == "Y" || checkforlocal == "y")
@@ -75,21 +86,30 @@ namespace MetricLoadTime.Server.Controllers
             );
 
             var finalColumns = GetFinalColumns(con, tableQuery, columnsQuery);
-            GetAllCombination(measureListSQLQuery, measureReferenceQuery, relationshipQuery, tableQuery, finalColumns, columnsQuery);
+            _allCombinations = GetAllCombination(measureListSQLQuery, measureReferenceQuery, relationshipQuery, tableQuery, finalColumns, columnsQuery);
 
-            return Ok(1);
+            ExecuteAllQuery(_allCombinations, con);
+
+            var jsonResult = _allCombinations.AsEnumerable().Select(row => new
+            {
+                UniqueID = row["UniqueID"],
+                Measure = row["Measure"],
+                DimensionName = row["DimensionName"],
+                ColumnName = row["ColumnName"],
+                LoadTime = row["LoadTime"],
+                isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
+                ReportName = row["ReportName"],
+                PageName = row["PageName"],
+                VisualName = row["VisualName"],
+                VisualTitle = row["VisualTitle"],
+                Query = row["Query"],
+                hasDimension = row["hasDimension"]
+            });
+
+            return Ok(jsonResult);
         }
 
-        [HttpGet("analyze")]
-        public IActionResult Analyze(string filePath, string modelName, string endPoint, float thresholdValue, int runningFirstTime)
-        {
-            _endPoint = endPoint;
-            _modelName = modelName;
-            _thresholdValue = thresholdValue;
-            _runningFirstTime = runningFirstTime;
-            _reportData = GetReportData(filePath);
-            return Ok(1);
-        }
+        
 
         [HttpGet("progressBar")]
         public IActionResult ProgressBar()
@@ -100,6 +120,96 @@ namespace MetricLoadTime.Server.Controllers
         };
 
             return Ok(response);
+        }
+
+
+        [HttpGet("getloadtime")]
+        public IActionResult GetLoadTime()
+        {
+            var jsonResult = _allCombinations.AsEnumerable().Select(row => new
+            {
+                UniqueID = row["UniqueID"],
+                Measure = row["Measure"],
+                DimensionName = row["DimensionName"],
+                ColumnName = row["ColumnName"],
+                LoadTime = row["LoadTime"],
+                isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
+                ReportName = row["ReportName"],
+                PageName = row["PageName"],
+                VisualName = row["VisualName"],
+                VisualTitle = row["VisualTitle"],
+                Query = row["Query"],
+                hasDimension = row["hasDimension"]
+            });
+
+            return Ok(jsonResult);
+        }
+
+
+        void ExecuteAllQuery(DataTable allQueries, dynamic con)
+        {
+            ThreadPool.SetMinThreads(5, 5);
+            ThreadPool.SetMaxThreads(5, 5);
+            List<Task> tasks = new List<Task>();
+
+            for (int i = 0; i < allQueries.Rows.Count; i++)
+            {
+                string query = allQueries.Rows[i]["Query"].ToString(); // Assuming "Query" is the column name
+                int rowIndex = i;
+                GetQueryExecutionTime(query, _thresholdValue, rowIndex, con, allQueries);
+                //tasks.Add(Task.Run(() => GetQueryExecutionTime(query, thresholdValue, rowIndex, allQueries)));
+            }
+            //Task.WaitAll(tasks.ToArray());
+
+            CreateExcelSheet(allQueries, "RES.xlsx");
+        }
+
+
+
+        void GetQueryExecutionTime(string query, double thresholdTime, int rowIndex, dynamic con, DataTable allQueries)
+        {
+
+            //var con = new AdomdConnection("Provider=MSOLAP.8;Data Source=powerbi://api.powerbi.com/v1.0/myorg/Sprouts EDW;Initial Catalog=UPC Shrink & DOS");
+            con.Open();
+            var command = new AdomdCommand(query, con);
+            int CommandTimeout = (int)(thresholdTime + 1);
+            int thresholdTimeMS = (int)(thresholdTime * 1000);
+            command.CommandTimeout = CommandTimeout;
+            double queryExecutionTime = 0;
+            Console.WriteLine($"Currently running {query}");
+            try
+            {
+                DateTime startTime = DateTime.Now;
+                var cancellationTokenSource = new CancellationTokenSource();
+                var executionTask = Task.Run(() =>
+                {
+                    using (cancellationTokenSource.Token.Register(() => command.Cancel()))
+                    {
+                        return command.ExecuteReader();
+                    }
+                });
+                if (!executionTask.Wait(CommandTimeout))
+                {
+                    cancellationTokenSource.Cancel();
+                    Console.WriteLine($"Query took too long to execute. Aborting query...");
+
+                    queryExecutionTime = thresholdTime;
+                }
+                else
+                {
+                    DateTime endTime = DateTime.Now;
+                    queryExecutionTime = (endTime - startTime).TotalSeconds;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error executing query: {ex.Message}");
+                queryExecutionTime = -1; // Error occurred
+            }
+            con.Close();
+            Console.WriteLine("Query execution time:"+queryExecutionTime);
+            allQueries.Rows[rowIndex]["LoadTime"] = queryExecutionTime;
+
         }
 
         DataTable GetFinalColumns(dynamic con, DataTable tableQuery, DataTable columnsQuery)
@@ -614,13 +724,20 @@ namespace MetricLoadTime.Server.Controllers
             possibleCombinations.Merge(mergedDF);
             possibleCombinations.Merge(MeasuresWithDimensions);
 
-            // Select required columns from possibleCombinations
-            possibleCombinations = possibleCombinations.DefaultView.ToTable(false,
+            possibleCombinations.Columns.Add("UniqueID", typeof(int));
+
+            for (int i = 0; i < possibleCombinations.Rows.Count; i++)
+            {
+                possibleCombinations.Rows[i]["UniqueID"] = i + 1;
+            }
+
+            possibleCombinations = possibleCombinations.DefaultView.ToTable(false, "UniqueID",
                 "Measure", "DimensionName", "ColumnName", "LoadTime", "isMeasureUsedInVisual",
                 "ReportName", "PageName", "VisualName", "VisualTitle", "Query", "hasDimension");
 
 
             CreateExcelSheet(possibleCombinations, "possibleCombinations.xlsx");
+
             return possibleCombinations;
 
         }
