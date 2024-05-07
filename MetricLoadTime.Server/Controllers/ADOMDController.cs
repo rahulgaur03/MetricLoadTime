@@ -20,11 +20,18 @@ namespace MetricLoadTime.Server.Controllers
     [Route("api/[controller]")]
     public class ADOMDController : ControllerBase
     {
-        [HttpGet("analyze")]
-        public IActionResult Analyze(string filePath, string modelName, string endPoint, float thresholdValue, int runningFirstTime, string userName, string pass)
-        {
-            GetReportData(filePath);
+        private static string _endPoint;
+        private static string _modelName;
+        private static float _thresholdValue;
+        private static int _runningFirstTime;
+        private static string _extractPath;
+        private static Dictionary<string, int> _columnCountProgressTracker = new Dictionary<string, int> { { "Total", 0 }, { "Progress", 0 } };
 
+
+
+        [HttpGet("progress")]
+        public IActionResult Progress(string userName, string pass)
+        {
             var checkforlocal = "N";
             var connectionstring = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=b45e4eee-a93c-4fb8-a3a7-108c5ed3edb4;Data Source=localhost:52797;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
             var con = new AdomdConnection();
@@ -35,10 +42,9 @@ namespace MetricLoadTime.Server.Controllers
             }
             else
             {
-                connectionstring = "Provider=MSOLAP.8;Data Source=" + endPoint + ";initial catalog=" + modelName + ";UID=;PWD=";
-                // connectionstring = "Provider=MSOLAP.8;Data Source=" + endPoint + ";initial catalog=" + modelName + ";UID=" + userName + ";PWD=" + pass + "";
+                // connectionstring = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
+                connectionstring = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + userName + ";PWD=" + pass + "";
             }
-
             con.ConnectionString = connectionstring;
             con.Open();
             con.Close();
@@ -73,6 +79,28 @@ namespace MetricLoadTime.Server.Controllers
             return Ok(1);
         }
 
+        [HttpGet("analyze")]
+        public IActionResult Analyze(string filePath, string modelName, string endPoint, float thresholdValue, int runningFirstTime)
+        {
+            _endPoint = endPoint;
+            _modelName = modelName;
+            _thresholdValue = thresholdValue;
+            _runningFirstTime = runningFirstTime;
+            GetReportData(filePath);
+            return Ok(1);
+        }
+
+        [HttpGet("progressBar")]
+        public IActionResult ProgressBar()
+        {
+            var response = new Dictionary<string, int>{
+            { "Total", _columnCountProgressTracker["Total"] },
+            { "Progress", _columnCountProgressTracker["Progress"] }
+        };
+
+            return Ok(response);
+        }
+
         DataTable GetFinalColumns(dynamic con, DataTable tableQuery, DataTable columnsQuery)
         {
             var dfRows = tableQuery.AsEnumerable();
@@ -103,10 +131,10 @@ namespace MetricLoadTime.Server.Controllers
             }
 
             df.Columns.Add("Count", typeof(int));
+            _columnCountProgressTracker["Total"] = df.Rows.Count;
             for (int i = 0; i < df.Rows.Count; i++)
             {
                 DataRow row = df.Rows[i];
-
                 string query = row["ValuesQuery"].ToString();
                 try
                 {
@@ -124,6 +152,7 @@ namespace MetricLoadTime.Server.Controllers
                     Debug.WriteLine(query);
 
                 }
+                _columnCountProgressTracker["Progress"] = i+1;
             }
             DataTable ColumnValuesCount = df;
             DataTable RowNumberPerDimension = ColumnValuesCount;
@@ -197,7 +226,7 @@ namespace MetricLoadTime.Server.Controllers
                     }
                 }
             }
-            CreateExcelSheet("C:\\Users\\RahulGaurMAQSoftware\\Downloads\\CIP\\Refresh Tracker", finalColumns, "resultDataFrame.xlsx");
+            CreateExcelSheet(finalColumns, "resultDataFrame.xlsx");
             return finalColumns;
         }
 
@@ -205,6 +234,7 @@ namespace MetricLoadTime.Server.Controllers
         {
             // Extract ZIP file
             var extractPath = Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
+            _extractPath = extractPath;
             ZipFile.ExtractToDirectory(filePath, extractPath, true);
             Console.WriteLine("Extraction complete");
 
@@ -289,12 +319,12 @@ namespace MetricLoadTime.Server.Controllers
             }
 
             // Save DataTable to Excel
-            CreateExcelSheet(extractPath, dataTable, "dataTable.xlsx");
+            CreateExcelSheet(dataTable, "dataTable.xlsx");
             Console.WriteLine("Created Array");
         }
-        void CreateExcelSheet(string extractPath, DataTable dataTable, string ExcelName)
+        void CreateExcelSheet(DataTable dataTable, string ExcelName)
         {
-            var excelFileName = Path.Combine(extractPath, ExcelName);
+            var excelFileName = Path.Combine(_extractPath, ExcelName);
             using (var workbook = new XLWorkbook())
             {
                 var worksheet = workbook.Worksheets.Add(dataTable, "Sheet1");
