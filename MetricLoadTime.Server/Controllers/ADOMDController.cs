@@ -15,63 +15,66 @@ namespace MetricLoadTime.Server.Controllers
     [Route("api/[controller]")]
     public class ADOMDController : ControllerBase
     {
-
-        private readonly static AdomdConnection _con = new AdomdConnection();
+        private readonly static AdomdConnection _con = new();
+        private static string? _connectionString;
         private static string _endPoint = "";
         private static string _modelName = "";
         private static float _thresholdValue = 0;
         private static int _runningFirstTime = 1;
         private static string _extractPath = "";
-        private static Dictionary<string, int> _columnCountProgressTracker = new Dictionary<string, int> { { "Total", 0 }, { "Progress", 0 } };
-        private static DataTable _reportData;
-        private static DataTable _allCombinations;
+        private static DataTable? _reportData;
+        private static DataTable? _allCombinations;
+        private static DataTable? _allColumnCount;
 
-        [HttpGet("analyze")]
-        public IActionResult Analyze(string filePath, string modelName, string endPoint, float thresholdValue, int runningFirstTime)
+        [HttpPost("analyze")]
+        public IActionResult Analyze([FromBody] AnalyzeRequest request)
         {
-            _endPoint = endPoint;
-            _modelName = modelName;
-            _thresholdValue = thresholdValue;
-            _runningFirstTime = runningFirstTime;
+            _endPoint = request.EndPoint;
+        _modelName = request.ModelName;
+        _thresholdValue = request.ThresholdValue;
+        _runningFirstTime = request.RunningFirstTime;
             _reportData = GetReportData(filePath);
             return Ok(1);
         }
 
-        [HttpGet("progress")]
+        [HttpPost("progress")]
         public IActionResult Progress(string userName, string pass)
         {
-            _con.ConnectionString = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=a5ba62db-5e27-4e63-ac65-04cc570e6f9d;Data Source=localhost:51651;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
-            // _con.ConnectionString= "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + userName + ";PWD=" + pass + "";
+            // _connectionString = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=f31afe8e-99ed-49b0-a520-2a3f1723eb35;Data Source=localhost:54659;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
+            _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + userName + ";PWD=" + pass + "";
+            _con.ConnectionString = _connectionString;
+
+            var tableQuery = ExecuteDataTable(
+                "SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
+                ["TableName", "TableID"], _con
+            );
+
+            var columnsQuery = ExecuteDataTable(
+                "SELECT DISTINCT [TableID], [ExplicitName], [InferredName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
+                ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], _con
+            );
 
             var measureListSQLQuery = ExecuteDataTable(
                 "SELECT [MEASURE_NAME],[MEASUREGROUP_NAME],[EXPRESSION],[CUBE_NAME] FROM $SYSTEM.MDSCHEMA_MEASURES WHERE MEASURE_IS_VISIBLE AND MEASUREGROUP_NAME <> 'Reporting Filters' ORDER BY [MEASUREGROUP_NAME]",
-                new List<string> { "Measure", "MeasureGroup", "Expression", "CubeName" }
+                ["Measure", "MeasureGroup", "Expression", "CubeName"], _con
             );
 
             var measureReferenceQuery = ExecuteDataTable(
                 "SELECT DISTINCT [Object], [Referenced_Table] FROM $SYSTEM.DISCOVER_CALC_DEPENDENCY WHERE [Object_Type] = 'MEASURE'",
-                new List<string> { "Measure", "Referenced_Table" }
+                ["Measure", "Referenced_Table"], _con
             );
 
             var relationshipQuery = ExecuteDataTable(
                 "SELECT DISTINCT [FromTableID], [FromColumnID], [ToTableID], [ToColumnID] FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS WHERE [IsActive]",
-                new List<string> { "FromTableID", "FromColumnID", "ToTableID", "ToColumnID" }
+                ["FromTableID", "FromColumnID", "ToTableID", "ToColumnID"], _con
             );
 
-            var tableQuery = ExecuteDataTable(
-                "SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
-                new List<string> { "TableName", "TableID" }
-            );
-
-            var columnsQuery = ExecuteDataTable(
-                "SELECT DISTINCT [TableID], [ExplicitName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
-                new List<string> { "TableID", "ColumnName", "ColumnID" }
-            );
-
+            foreach (DataRow row in columnsQuery.Rows) row["ColumnName"] = string.IsNullOrWhiteSpace(row["ColumnName"]?.ToString()) ? row["InferredColumnName"]?.ToString() : row["ColumnName"]?.ToString();
+            columnsQuery.Columns.Remove("InferredColumnName");
             var finalColumns = GetFinalColumns(tableQuery, columnsQuery);
             _allCombinations = GetAllCombination(measureListSQLQuery, measureReferenceQuery, relationshipQuery, tableQuery, finalColumns, columnsQuery);
 
-            ExecuteAllQuery(_allCombinations);
+            Task.Run(() => ExecuteAllQuery(_allCombinations));
 
             var jsonResult = _allCombinations.AsEnumerable().Select(row => new
             {
@@ -80,6 +83,7 @@ namespace MetricLoadTime.Server.Controllers
                 DimensionName = row["DimensionName"],
                 ColumnName = row["ColumnName"],
                 LoadTime = row["LoadTime"],
+                PreviousLoadTime = row["PreviousLoadTime"],
                 isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
                 ReportName = row["ReportName"],
                 PageName = row["PageName"],
@@ -95,10 +99,23 @@ namespace MetricLoadTime.Server.Controllers
         [HttpGet("progressBar")]
         public IActionResult ProgressBar()
         {
+            int total = 0;
+            int progress = 0;
+
+            try
+            {
+                total = _allColumnCount.Rows.Count;
+                foreach (DataRow row in _allColumnCount.Rows)
+                {
+                    progress += int.Parse(row["ProgressStatus"].ToString());
+                }
+            }
+            catch { }
+
             var response = new Dictionary<string, int>{
-            { "Total", _columnCountProgressTracker["Total"] },
-            { "Progress", _columnCountProgressTracker["Progress"] }
-        };
+            { "Total", total },
+            { "Progress", progress }
+            };
 
             return Ok(response);
         }
@@ -113,6 +130,7 @@ namespace MetricLoadTime.Server.Controllers
                 DimensionName = row["DimensionName"],
                 ColumnName = row["ColumnName"],
                 LoadTime = row["LoadTime"],
+                PreviousLoadTime = row["PreviousLoadTime"],
                 isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
                 ReportName = row["ReportName"],
                 PageName = row["PageName"],
@@ -125,44 +143,53 @@ namespace MetricLoadTime.Server.Controllers
             return Ok(jsonResult);
         }
 
-
-        [HttpGet("reload")]
+        [HttpPost("reload")]
         public IActionResult Reload(int uniqueID, string query)
         {
-            double loadTime = GetQueryExecutionTime(query, uniqueID - 1, _allCombinations);
+            _allCombinations.Rows[uniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[uniqueID - 1]["LoadTime"];
+            double loadTime = GetQueryExecutionTime(query, uniqueID - 1, _allCombinations, _con);
 
             return Ok(loadTime);
         }
 
-
         void ExecuteAllQuery(DataTable allQueries)
         {
-            ThreadPool.SetMinThreads(5, 5);
-            ThreadPool.SetMaxThreads(5, 5);
-            List<Task> tasks = new List<Task>();
+            var semaphore = new SemaphoreSlim(10);
+            List<Task> tasks = [];
 
             for (int i = 0; i < allQueries.Rows.Count; i++)
             {
                 string query = allQueries.Rows[i]["Query"].ToString();
                 int rowIndex = i;
-                GetQueryExecutionTime(query, rowIndex, allQueries);
-                //tasks.Add(Task.Run(() => GetQueryExecutionTime(query, thresholdValue, rowIndex, allQueries)));
+                // GetQueryExecutionTime(query, rowIndex, allQueries);
+                tasks.Add(Task.Run(async () =>
+                {
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        using var connection = new AdomdConnection(_connectionString);
+                        GetQueryExecutionTime(query, rowIndex, allQueries, connection);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
             }
-            //Task.WaitAll(tasks.ToArray());
+            Task.WhenAll(tasks).Wait();
 
             CreateExcelSheet(allQueries, "RES.xlsx");
         }
 
 
-        double GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries)
+        double GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries, dynamic connection)
         {
-            _con.Open();
-            var command = new AdomdCommand(query, _con);
+            connection.Open();
+            var command = new AdomdCommand(query, connection);
             int CommandTimeout = (int)(_thresholdValue + 1);
             int thresholdTimeMS = (int)(_thresholdValue * 1000);
             command.CommandTimeout = CommandTimeout;
             double queryExecutionTime = 0;
-            Console.WriteLine($"Currently running {query}");
             try
             {
                 DateTime startTime = DateTime.Now;
@@ -174,7 +201,7 @@ namespace MetricLoadTime.Server.Controllers
                         return command.ExecuteReader();
                     }
                 });
-                if (!executionTask.Wait(CommandTimeout))
+                if (!executionTask.Wait(thresholdTimeMS))
                 {
                     cancellationTokenSource.Cancel();
                     Console.WriteLine($"Query took too long to execute. Aborting query...");
@@ -193,7 +220,7 @@ namespace MetricLoadTime.Server.Controllers
                 queryExecutionTime = -1; // Error occurred
             }
             _con.Close();
-            Console.WriteLine("Query execution time:" + queryExecutionTime);
+            Console.WriteLine($"Query: {query}\nExecution time:{queryExecutionTime}");
             allQueries.Rows[rowIndex]["LoadTime"] = queryExecutionTime;
             return queryExecutionTime;
 
@@ -203,6 +230,8 @@ namespace MetricLoadTime.Server.Controllers
         {
             var dfRows = tableQuery.AsEnumerable();
             var df1Rows = columnsQuery.AsEnumerable();
+            List<Task> tasks = [];
+            var semaphore = new SemaphoreSlim(10);
 
             // Perform inner join using LINQ
             var tableWithColumn = from row1 in dfRows
@@ -220,46 +249,60 @@ namespace MetricLoadTime.Server.Controllers
 
             df.Columns.Add("ValuesQuery", typeof(string));
             df.Columns.Add("ID", typeof(string));
+            df.Columns.Add("Count", typeof(int));
+            df.Columns.Add("ProgressStatus", typeof(int));
 
             for (int i = 0; i < df.Rows.Count; i++)
             {
                 DataRow row = df.Rows[i];
                 row["ValuesQuery"] = "WITH MEMBER [Measures].[Count] AS [" + row["TableName"] + "].[" + row["ColumnName"] + "].[" + row["ColumnName"] + "].Count SELECT {[Measures].[Count]} ON COLUMNS  FROM [Model]";
                 row["ID"] = i + 1;
+                row["ProgressStatus"] = 0;
             }
 
-            df.Columns.Add("Count", typeof(int));
-            _columnCountProgressTracker["Total"] = df.Rows.Count;
-            for (int i = 0; i < df.Rows.Count; i++)
+            _allColumnCount = df;
+            for (int i = 0; i < _allColumnCount.Rows.Count; i++)
             {
-                DataRow row = df.Rows[i];
-                string query = row["ValuesQuery"].ToString();
-                try
+                string query = _allColumnCount.Rows[i]["ValuesQuery"].ToString();
+                int rowIndex = i;
+                tasks.Add(Task.Run(async () =>
                 {
-                    List<string> columnsList = new List<string> { "Count" };
-                    DataTable tempDF = ExecuteDataTable(query, columnsList);
-                    df.Rows[i]["Count"] = tempDF.Rows[0]["Count"];
-                    Console.WriteLine(tempDF.Rows[0]["Count"]);
-                    Console.WriteLine("Column Values Count queries are running....");
+                    await semaphore.WaitAsync();
+                    try
+                    {
 
-                }
-                catch
-                {
-                    df.Rows[i]["Count"] = int.MaxValue;
-                    Console.WriteLine("Failed Column Values Count queries are running....");
-                    Debug.WriteLine(query);
-
-                }
-                _columnCountProgressTracker["Progress"] = i + 1;
+                        using var connection = new AdomdConnection(_connectionString);
+                        DataTable tempDF = ExecuteDataTable(query, ["Count"], connection);
+                        _allColumnCount.Rows[rowIndex]["Count"] = tempDF.Rows[0]["Count"];
+                        _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
+                        Console.WriteLine(rowIndex + " " + _allColumnCount.Rows[rowIndex]["ColumnName"] + " Column Values Count: " + _allColumnCount.Rows[rowIndex]["Count"]);
+                    }
+                    catch
+                    {
+                        _allColumnCount.Rows[rowIndex]["Count"] = int.MaxValue;
+                        _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
+                        Console.WriteLine("Failed Column Values Count " + _allColumnCount.Rows[rowIndex]["ColumnName"]);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
             }
-            DataTable ColumnValuesCount = df;
-            DataTable RowNumberPerDimension = ColumnValuesCount;
+            Task.WhenAll(tasks).Wait();
+
+            DataTable RowNumberPerDimension = _allColumnCount;
+
+            // Clone the structure to fix the issue
+            DataTable newDataTable = RowNumberPerDimension.Clone();
+            foreach (DataRow row in RowNumberPerDimension.Rows) { newDataTable.ImportRow(row); }
+            RowNumberPerDimension = newDataTable;
+
             RowNumberPerDimension.DefaultView.Sort = "TableName ASC, Count ASC";
             RowNumberPerDimension = RowNumberPerDimension.DefaultView.ToTable();
             RowNumberPerDimension.Columns.Add("RowNumber", typeof(string));
             var groupedRows = RowNumberPerDimension.AsEnumerable()
             .GroupBy(row => row.Field<string>("TableName"));
-
             int rowCount = 0;
             foreach (var group in groupedRows)
             {
@@ -292,7 +335,7 @@ namespace MetricLoadTime.Server.Controllers
             }
 
 
-            DataTable MeanRowNumberdf = new DataTable();
+            DataTable MeanRowNumberdf = new();
             MeanRowNumberdf.Columns.Add("TableName", typeof(string));
             MeanRowNumberdf.Columns.Add("MeanRowNumber", typeof(string));
 
@@ -304,7 +347,7 @@ namespace MetricLoadTime.Server.Controllers
                 MeanRowNumberdf.Rows.Add(newRow);
             }
 
-            DataTable finalColumns = new DataTable();
+            DataTable finalColumns = new();
             finalColumns.Columns.Add("TableName", typeof(string));
             finalColumns.Columns.Add("ColumnName", typeof(string));
             finalColumns.Columns.Add("RowNumber", typeof(string));
@@ -345,7 +388,7 @@ namespace MetricLoadTime.Server.Controllers
             dynamic fileContents = JsonConvert.DeserializeObject(layoutContent);
 
             // Initialize DataTable
-            DataTable dataTable = new DataTable();
+            DataTable dataTable = new();
             var columns = new[] { "PageName", "VisualName", "MeasureName", "ColumnName", "DimensionName", "VisualTitle" };
             foreach (var column in columns)
                 dataTable.Columns.Add(column, typeof(string));
@@ -358,7 +401,7 @@ namespace MetricLoadTime.Server.Controllers
                 var pageName = section.displayName;
                 foreach (var container in section.visualContainers)
                 {
-                    dynamic visualData = null;
+                    dynamic visualData;
                     try
                     {
                         visualData = JObject.Parse(container.config.ToString()).singleVisual;
@@ -427,7 +470,7 @@ namespace MetricLoadTime.Server.Controllers
         {
             DataTable parsedDataFrame = _reportData;
 
-            DataTable MeasureTimeWithDimensions = new DataTable();
+            DataTable MeasureTimeWithDimensions = new();
 
             DataTable TempMeasureCalculationQuery = measureListSQLQuery;
             DataTable MeasureReferences = measureReferenceQuery;
@@ -511,7 +554,7 @@ namespace MetricLoadTime.Server.Controllers
             MeasuresWithDimensions = MeasureTimeWithDimensions;
 
 
-            DataTable MeasureTimeWithoutDimensions = new DataTable();
+            DataTable MeasureTimeWithoutDimensions = new();
             DataTable TempMeasureCalculation = measureListSQLQuery;
             MeasureTimeWithoutDimensions.Columns.Add("Measure", typeof(string));
             MeasureTimeWithoutDimensions.Columns.Add("MeasureGroup", typeof(string));
@@ -711,15 +754,17 @@ namespace MetricLoadTime.Server.Controllers
             possibleCombinations.Merge(mergedDF);
             possibleCombinations.Merge(MeasuresWithDimensions);
 
+            possibleCombinations.Columns.Add("PreviousLoadTime", typeof(string));
             possibleCombinations.Columns.Add("UniqueID", typeof(int));
 
             for (int i = 0; i < possibleCombinations.Rows.Count; i++)
             {
                 possibleCombinations.Rows[i]["UniqueID"] = i + 1;
+                possibleCombinations.Rows[i]["PreviousLoadTime"] = "--";
             }
 
             possibleCombinations = possibleCombinations.DefaultView.ToTable(false, "UniqueID",
-                "Measure", "DimensionName", "ColumnName", "LoadTime", "isMeasureUsedInVisual",
+                "Measure", "DimensionName", "ColumnName", "LoadTime", "PreviousLoadTime", "isMeasureUsedInVisual",
                 "ReportName", "PageName", "VisualName", "VisualTitle", "Query", "hasDimension");
 
 
@@ -742,22 +787,14 @@ namespace MetricLoadTime.Server.Controllers
             Console.WriteLine("Saved DataTable to Excel file: " + excelFileName);
         }
 
-        DataTable ExecuteDataTable(string query, List<string> columnsList)
+        DataTable ExecuteDataTable(string query, List<string> columnsList, dynamic connection)
         {
-            try
-            {
-                _con.Open();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Connection Issue: {ex.Message}");
-            }
-
-            var command = new AdomdCommand(query, _con);
+            connection.Open();
+            var command = new AdomdCommand(query, connection);
             var reader = command.ExecuteReader();
 
 
-            DataTable dataTable = new DataTable();
+            DataTable dataTable = new();
             for (int i = 0; i < reader.FieldCount; i++)
             {
                 dataTable.Columns.Add(columnsList[i], typeof(string));
@@ -774,15 +811,15 @@ namespace MetricLoadTime.Server.Controllers
                 dataTable.Rows.Add(row);
             }
 
-            _con.Close();
+            connection.Close();
 
             return dataTable;
         }
 
         DataTable ConvertToDataTable(IEnumerable dataRows)
         {
-            DataTable dataTable = new DataTable();
-            List<string> columnList = new List<string>();
+            DataTable dataTable = new();
+            List<string> columnList = [];
 
             Type? itemType = null;
             foreach (var item in dataRows)
@@ -804,7 +841,7 @@ namespace MetricLoadTime.Server.Controllers
                 foreach (var column in columnList)
                 {
                     // Access property dynamically using reflection
-                    object columnValue = row.GetType().GetProperty(column)?.GetValue(row);
+                    object? columnValue = row.GetType().GetProperty(column)?.GetValue(row);
                     newRow[column] = columnValue != null ? columnValue.ToString() : string.Empty;
                 }
                 dataTable.Rows.Add(newRow);
@@ -819,7 +856,11 @@ namespace MetricLoadTime.Server.Controllers
             int result = number1 + number2;
             return Ok(result);
         }
+    }
 
+    public class AnalyzeRequest
+    {
+        public string EndPoint { get; internal set; }
     }
 
     public class ConnectionsValue
