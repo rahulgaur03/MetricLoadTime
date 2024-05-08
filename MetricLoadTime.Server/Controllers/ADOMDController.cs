@@ -30,18 +30,19 @@ namespace MetricLoadTime.Server.Controllers
         public IActionResult Analyze([FromBody] AnalyzeRequest request)
         {
             _endPoint = request.EndPoint;
-        _modelName = request.ModelName;
-        _thresholdValue = request.ThresholdValue;
-        _runningFirstTime = request.RunningFirstTime;
-            _reportData = GetReportData(filePath);
+            _modelName = request.ModelName;
+            _thresholdValue = request.ThresholdValue;
+            _runningFirstTime = request.RunningFirstTime;
+            _reportData = GetReportData(request.FilePath);
+            Console.WriteLine("", _endPoint);
             return Ok(1);
         }
 
         [HttpPost("progress")]
-        public IActionResult Progress(string userName, string pass)
+        public IActionResult Progress([FromBody] ProgressRequest request)
         {
             // _connectionString = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=f31afe8e-99ed-49b0-a520-2a3f1723eb35;Data Source=localhost:54659;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
-            _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + userName + ";PWD=" + pass + "";
+            _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + request.Username + ";PWD=" + request.Password + "";
             _con.ConnectionString = _connectionString;
 
             var tableQuery = ExecuteDataTable(
@@ -144,10 +145,10 @@ namespace MetricLoadTime.Server.Controllers
         }
 
         [HttpPost("reload")]
-        public IActionResult Reload(int uniqueID, string query)
+        public IActionResult Reload([FromBody] ReloadRequest request)
         {
-            _allCombinations.Rows[uniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[uniqueID - 1]["LoadTime"];
-            double loadTime = GetQueryExecutionTime(query, uniqueID - 1, _allCombinations, _con);
+            _allCombinations.Rows[request.UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[request.UniqueID - 1]["LoadTime"];
+            double loadTime = GetQueryExecutionTime(request.Query, request.UniqueID - 1, _allCombinations, _con);
 
             return Ok(loadTime);
         }
@@ -858,9 +859,25 @@ namespace MetricLoadTime.Server.Controllers
         }
     }
 
+    public class ReloadRequest
+    {
+        public int UniqueID { get; set; }
+        public string Query { get; set; }
+    }
+
+    public class ProgressRequest
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+    }
+
     public class AnalyzeRequest
     {
-        public string EndPoint { get; internal set; }
+        public string EndPoint { get; set; }
+        public string ModelName { get; set; }
+        public float ThresholdValue { get; set; }
+        public int RunningFirstTime { get; set; }
+        public string FilePath { get; set; }
     }
 
     public class ConnectionsValue
