@@ -12,7 +12,7 @@ const InputComponent = ({ setCombinations }) => {
 
   const [model, setModel] = useState('powerbi');
 
-  const [progress, setProgress] = useState({});
+  const [progress, setProgress] = useState({Total: 100, Progress: 0});
   const [popoverVisible, setPopoverVisible] = useState(false);
   const [progresspopoverVisible, setprogressPopoverVisible] = useState(false);
 
@@ -161,13 +161,14 @@ const InputComponent = ({ setCombinations }) => {
         }
         const progressData = await progressResponse.json();
         console.log(progressData);
-        setProgress(JSON.parse(progressData));
+        setProgress(progressData);
 
         if (generateCombinationsPromise) {
           const generateCombinationsResponse = await generateCombinationsPromise;
           if (generateCombinationsResponse.ok) {
             generateCombinationsResponse.clone().json().then(result => setCombinations(JSON.parse(result)));
             setPopoverVisible(false)
+            setprogressPopoverVisible(false);
             clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
           } else {
             clearInterval(intervalId); // Stop polling if generateCombinationsPromise fails
@@ -177,7 +178,7 @@ const InputComponent = ({ setCombinations }) => {
         console.error(error);
         // Handle error
       }
-    }, 5000); // Adjust polling interval as needed
+    }, 2000); // Adjust polling interval as needed
   };
 
 
