@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
-using System.Diagnostics;
 using Microsoft.AnalysisServices.AdomdClient;
 using ClosedXML.Excel;
 using System.IO.Compression;
@@ -43,13 +42,18 @@ namespace MetricLoadTime.Server.Controllers
         {
             // _connectionString = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=f31afe8e-99ed-49b0-a520-2a3f1723eb35;Data Source=localhost:54659;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
             _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + request.Username + ";PWD=" + request.Password + "";
+            // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=;UID=;PWD=" + request.Password + "";
+            // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
+            // _con.GetCloudConnectionAuthenticationProperties();
+            // _con.AccessToken = new AccessToken(token: request.Password, expirationTime: DateTimeOffset.Now.AddHours(2));
+            
             _con.ConnectionString = _connectionString;
 
             var tableQuery = ExecuteDataTable(
                 "SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
                 ["TableName", "TableID"], _con
             );
-
+            
             var columnsQuery = ExecuteDataTable(
                 "SELECT DISTINCT [TableID], [ExplicitName], [InferredName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
                 ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], _con
