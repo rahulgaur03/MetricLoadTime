@@ -70,7 +70,7 @@ const InputComponent = ({ setCombinations }) => {
   };
 
   const analyze = async () => {
-    let generateCombinationsPromise; // Define generateCombinationsPromise outside the try block
+    let analyzePromise; // Define generateCombinationsPromise outside the try block
     try {
       const requestBody = {
         FilePath: inputs.filePath,
@@ -82,7 +82,7 @@ const InputComponent = ({ setCombinations }) => {
 
       // Call /generatecombinations API without waiting for its response
       // generateCombinationsPromise = fetch('http://127.0.0.1:3002/generatecombinations', {
-      generateCombinationsPromise = fetch('api/adomd/analyze', {
+        analyzePromise = fetch('api/adomd/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,9 +91,9 @@ const InputComponent = ({ setCombinations }) => {
       });
 
 
-      const generateCombinationsResponse = await generateCombinationsPromise;
-      if (generateCombinationsResponse.ok) {
-          generateCombinationsResponse.clone().json().then(result => console.log(JSON.parse(result)));
+      const analyzeResponse = await analyzePromise;
+      if (analyzeResponse.ok) {
+          analyzeResponse.clone().json().then(result => console.log(JSON.parse(result)));
       }
 
       // Show popover
@@ -166,7 +166,8 @@ const InputComponent = ({ setCombinations }) => {
         if (generateCombinationsPromise) {
           const generateCombinationsResponse = await generateCombinationsPromise;
           if (generateCombinationsResponse.ok) {
-            generateCombinationsResponse.clone().json().then(result => setCombinations(JSON.parse(result)));
+            // console.log(generateCombinationsResponse.json())
+            generateCombinationsResponse.clone().json().then(results => setCombinations(results));
             setPopoverVisible(false)
             setprogressPopoverVisible(false);
             clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
@@ -350,9 +351,11 @@ const InputComponent = ({ setCombinations }) => {
               <Modal.Body>
                 <div className="modal-body">
                   <div className="progress" role="progressbar" aria-label="Basic example" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
-                    <div className="progress-bar" style={{ width: progress.progress + "%" }}></div>
+                    <div className="progress-bar" style={{ width: (progress.Progress/progress.Total)*100 + "%" }}></div>
                   </div>
-                  {progress.Progress}/{progress.Total}
+                  {
+                    (progress.Total) === 0 ? <p>File is Parsing .....</p> : <p> {progress.Progress}/{progress.Total}</p>
+                  }
                 </div>
               </Modal.Body>
               <Modal.Footer>

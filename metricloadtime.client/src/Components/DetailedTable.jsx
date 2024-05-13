@@ -49,7 +49,7 @@ import {
 // ];
 
 // export default function DataTable({ combinations }) {
-//   const [initialcombinations, setinitialcombinations] = useState(combinations.result);
+//   const [initialcombinations, setinitialcombinations] = useState(combinations.results);
 //   console.log(initialcombinations)
 
 
@@ -123,8 +123,8 @@ import {
 
 //           const data = await response.json();
 //           // Handle response data as needed
-//           // console.log(JSON.parse(data).result);
-//           updateArray(JSON.parse(data).result)
+//           // console.log(JSON.parse(data).results);
+//           updateArray(JSON.parse(data).results)
 //         } catch (error) {
 //           console.error("Error calling API:", error);
 //           // Handle error
@@ -163,18 +163,22 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
 } from 'material-react-table';
+import axios from "axios";
 
 
 const Example = ({combinations}) => {
 
-  const [initialcombinations, setinitialcombinations] = useState(combinations.result);
+  const [initialcombinations, setinitialcombinations] = useState(combinations.results);
+  const [rowSelection, setRowSelection] = useState({});
+
+  console.log(initialcombinations)
 
   const updateArray = (arrayB) => {
     setinitialcombinations(prevArrayA => {
         return prevArrayA.map((aItem, index) => {
-            const bItem = arrayB.find(item => item.UniqueID === aItem.UniqueID);
-            if (bItem && aItem.LoadTime !== bItem.LoadTime) {
-                return { ...aItem, LoadTime: bItem.LoadTime };
+            const bItem = arrayB.find(item => item.uniqueID === aItem.uniqueID);
+            if (bItem && aItem.loadTime !== bItem.loadTime) {
+                return { ...aItem, loadTime: bItem.loadTime, previousLoadTime: bItem.previousLoadTime };
             } else {
                 return aItem;
             }
@@ -182,98 +186,118 @@ const Example = ({combinations}) => {
     });
 };
 
-
-  React.useEffect(() => {
-    // const extractedParams = initialcombinations 
-    const extractedParams = initialcombinations.map(combination => {
-      return {
-          Query: combination.Query,
-          UniqueID: combination.UniqueID,
-          LoadTime : combination.LoadTime
-      };
-  });
-
-    const callApiInBatches = async () => {
-      const batchSize = 5;
-      const numBatches = Math.ceil(initialcombinations.length / batchSize);
-
-      for (let i = 0; i < numBatches; i++) {
-        const startIdx = i * batchSize;
-        const endIdx = Math.min(
-          startIdx + batchSize,
-          initialcombinations.length
-        );
-        const batchParams = extractedParams.slice(startIdx, endIdx);
-
+const handleReload = () =>
+{
+  const fetchData = async () => {
+    const fetchedQueries = [];
+    for (const id in rowSelection) {
+      const matchingCombination = initialcombinations.find((c) => c.uniqueID.toString() === id);
+      if (matchingCombination) {
         try {
-          const response = await fetch("http://127.0.0.1:3002/firequery", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              query: batchParams,
-              connection_string: combinations.connectionString,
-              threshold_time: 5,
-            }),
+          const response = await axios.post('http://localhost:8001/api/adomd/reload', {
+             uniqueID: id, Query: matchingCombination.query 
           });
-
-          if (!response.ok) {
-            throw new Error("API call failed");
-          }
-
-          const data = await response.json();
-          // console.log(data);
-          updateArray(JSON.parse(data).result)
+          // fetchedQueries.push({ uniqueID: row.uniqueID, query: response.data });
+          console.log(response.data)
+          updateArray(response.data)
+          setTimeout(() => {
+            setRowSelection({})
+          }, 2000);
         } catch (error) {
-          console.error("Error calling API:", error);
+          console.error(`Failed to fetch query for ID ${id}: ${error.message}`);
+        }
+      } else {
+        console.warn(`No matching combination found for ID ${id}`);
+      }
+    }
+  };
+
+  fetchData();
+}
+
+
+
+  const intervalId = setInterval(async () => {
+    try {
+
+      const loadTimes = initialcombinations.map(entry => entry.loadTime);
+      if(loadTimes.includes("x") == false){
+        clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
+      }
+      else{
+        let generateCombinationsPromise
+
+
+        generateCombinationsPromise = fetch('api/adomd/getloadtime', {
+          method: 'GET',
+        });
+
+        
+
+        if (generateCombinationsPromise) {
+          const generateCombinationsResponse = await generateCombinationsPromise;
+          if (generateCombinationsResponse.ok) {
+            // console.log(generateCombinationsResponse.json())
+            generateCombinationsResponse.clone().json().then(results => setinitialcombinations(results));
+            clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
+          } else {
+            clearInterval(intervalId); // Stop polling if generateCombinationsPromise fails
+          }
         }
       }
-    };
+    } catch (error) {
+      console.error(error);
+      // Handle error
+    }
+  }, 5000); // Adjust polling interval as needed
 
-    callApiInBatches();
-  }, []); 
 
 
 const columns = useMemo(
     () => [
       {
-        accessorKey: 'Measure',
+        accessorKey: 'measure',
         header: 'Measure',
       },
       {
-        accessorKey: 'DimensionName',
+        accessorKey: 'dimensionName',
         header: 'Dimension Name',
       },
       {
-        accessorKey: 'ColumnName',
+        accessorKey: 'columnName',
         header: 'Column Name',
       },
       {
-        accessorKey: 'LoadTime',
+        accessorKey: 'loadTime',
         header: 'Load Time',
       },
       {
-        accessorKey: 'ReportName',
+        accessorKey: 'previousLoadTime',
+        header: 'Previous Load Time',
+      },
+      {
+        accessorKey: 'reportName',
         header: 'Report Name',
       },
       {
-        accessorKey: 'PageName',
+        accessorKey: 'pageName',
         header: 'Page Name',
       },
       {
-        accessorKey: 'VisualName',
+        accessorKey: 'visualName',
         header: 'Visual Name',
       },
       {
-        accessorKey: 'VisualTitle',
+        accessorKey: 'visualTitle',
         header: 'Visual Title',
       },
     ],
     [],
   );
 
-  const [rowSelection, setRowSelection] = useState({});
+
+
+  console.log(rowSelection)
 
 
   
@@ -281,8 +305,9 @@ const columns = useMemo(
     columns,
     data : initialcombinations,
     enableRowSelection: true,
-    getRowId:(row) => row.UniqueID,
+    getRowId:(row) => row.uniqueID,
     state: { rowSelection }, 
+    onRowSelectionChange: setRowSelection,
     // enablePagination: false,
 
   });
@@ -291,7 +316,13 @@ const columns = useMemo(
   //   console.info({ rowSelection }); 
   // }, [rowSelection]);
 
-  return <MaterialReactTable table={table} />;
+  return(
+  <div>
+    <button type="button" class="btn btn-danger" onClick={handleReload} >Reload</button>
+
+    <MaterialReactTable table={table} />;
+  </div>
+  )
 };
 
 export default Example;
