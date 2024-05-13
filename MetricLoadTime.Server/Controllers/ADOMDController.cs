@@ -191,7 +191,7 @@ namespace MetricLoadTime.Server.Controllers
         {
             _allCombinations.Rows[request.UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[request.UniqueID - 1]["LoadTime"];
             AdomdConnection _con = new(_connectionString);
-            double loadTime = GetQueryExecutionTime(request.Query, request.UniqueID - 1, _allCombinations, _con);
+            GetQueryExecutionTime(request.Query, request.UniqueID - 1, _allCombinations, _con);
 
             var jsonResult = _allCombinations.AsEnumerable()
                 .Where(row => Convert.ToInt32(row["UniqueID"]) == request.UniqueID)
@@ -223,14 +223,13 @@ namespace MetricLoadTime.Server.Controllers
             for (int i = 0; i < allQueries.Rows.Count; i++)
             {
                 string query = allQueries.Rows[i]["Query"].ToString();
-                int rowIndex = i;
                 tasks.Add(Task.Run(async () =>
                 {
                     await semaphore.WaitAsync();
                     try
                     {
                         using var connection = new AdomdConnection(_connectionString);
-                        GetQueryExecutionTime(query, rowIndex, allQueries, connection);
+                        GetQueryExecutionTime(query, i, allQueries, connection);
                     }
                     finally
                     {
@@ -241,7 +240,7 @@ namespace MetricLoadTime.Server.Controllers
             Task.WhenAll(tasks).Wait();
         }
 
-        double GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries, dynamic connection)
+        static void GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries, dynamic connection)
         {
             connection.Open();
             var command = new AdomdCommand(query, connection);
@@ -281,16 +280,12 @@ namespace MetricLoadTime.Server.Controllers
             connection.Dispose();
             Console.WriteLine($"Query: {query}\nExecution time:{queryExecutionTime}");
             allQueries.Rows[rowIndex]["LoadTime"] = queryExecutionTime;
-            return queryExecutionTime;
-
         }
 
         DataTable GetFinalColumns(DataTable tableQuery, DataTable columnsQuery)
         {
             var dfRows = tableQuery.AsEnumerable();
             var df1Rows = columnsQuery.AsEnumerable();
-            List<Task> tasks = [];
-            var semaphore = new SemaphoreSlim(15);
             var tableWithColumn = from row1 in dfRows
                                   join row2 in df1Rows
                                   on row1.Field<string>("TableID") equals row2.Field<string>("TableID")
@@ -301,23 +296,22 @@ namespace MetricLoadTime.Server.Controllers
                                       ColumnName = row2.Field<string>("ColumnName"),
                                       ColumnID = row2.Field<string>("ColumnID")
                                   };
+            _allColumnCount = ConvertToDataTable(tableWithColumn);
+            _allColumnCount.Columns.Add("ValuesQuery", typeof(string));
+            _allColumnCount.Columns.Add("ID", typeof(string));
+            _allColumnCount.Columns.Add("Count", typeof(int));
+            _allColumnCount.Columns.Add("ProgressStatus", typeof(int));
 
-            DataTable df = ConvertToDataTable(tableWithColumn);
-
-            df.Columns.Add("ValuesQuery", typeof(string));
-            df.Columns.Add("ID", typeof(string));
-            df.Columns.Add("Count", typeof(int));
-            df.Columns.Add("ProgressStatus", typeof(int));
-
-            for (int i = 0; i < df.Rows.Count; i++)
+            for (int i = 0; i < _allColumnCount.Rows.Count; i++)
             {
-                DataRow row = df.Rows[i];
+                DataRow row = _allColumnCount.Rows[i];
                 row["ValuesQuery"] = "WITH MEMBER [Measures].[Count] AS [" + row["TableName"] + "].[" + row["ColumnName"] + "].[" + row["ColumnName"] + "].Count SELECT {[Measures].[Count]} ON COLUMNS  FROM [Model]";
                 row["ID"] = i + 1;
                 row["ProgressStatus"] = 0;
             }
 
-            _allColumnCount = df;
+            List<Task> tasks = [];
+            SemaphoreSlim semaphore = new(15);
             for (int i = 0; i < _allColumnCount.Rows.Count; i++)
             {
                 string query = _allColumnCount.Rows[i]["ValuesQuery"].ToString();
@@ -328,9 +322,9 @@ namespace MetricLoadTime.Server.Controllers
                     try
                     {
 
-                        using var connection = new AdomdConnection(_connectionString);
-                        DataTable tempDF = ExecuteDataTable(query, ["Count"], connection);
-                        _allColumnCount.Rows[rowIndex]["Count"] = tempDF.Rows[0]["Count"];
+                        using AdomdConnection connection = new(_connectionString);
+                        DataTable columnRowCount = ExecuteDataTable(query, ["Count"], connection);
+                        _allColumnCount.Rows[rowIndex]["Count"] = columnRowCount.Rows[0]["Count"];
                         _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
                         Console.WriteLine(rowIndex + " " + _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"] + ")");
                     }
@@ -356,8 +350,7 @@ namespace MetricLoadTime.Server.Controllers
             RowNumberPerDimension.DefaultView.Sort = "TableName ASC, Count ASC";
             RowNumberPerDimension = RowNumberPerDimension.DefaultView.ToTable();
             RowNumberPerDimension.Columns.Add("RowNumber", typeof(string));
-            var groupedRows = RowNumberPerDimension.AsEnumerable()
-            .GroupBy(row => row.Field<string>("TableName"));
+            var groupedRows = RowNumberPerDimension.AsEnumerable().GroupBy(row => row.Field<string>("TableName"));
             int rowCount = 0;
             foreach (var group in groupedRows)
             {
@@ -369,7 +362,7 @@ namespace MetricLoadTime.Server.Controllers
                 }
             }
 
-            Dictionary<string, int> MeanRowNumber = new Dictionary<string, int>();
+            Dictionary<string, int> MeanRowNumber = [];
 
             foreach (DataRow row in RowNumberPerDimension.Rows)
             {
@@ -388,7 +381,6 @@ namespace MetricLoadTime.Server.Controllers
                     }
                 }
             }
-
 
             DataTable MeanRowNumberdf = new();
             MeanRowNumberdf.Columns.Add("TableName", typeof(string));
@@ -427,22 +419,20 @@ namespace MetricLoadTime.Server.Controllers
 
         DataTable GetReportData(string filePath)
         {
-            var extractPath = Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
-            _extractPath = extractPath;
-            ZipFile.ExtractToDirectory(filePath, extractPath, true);
+            _extractPath = Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
+            ZipFile.ExtractToDirectory(filePath, _extractPath, true);
 
-            var layoutPath = Path.Combine(extractPath, "Report", "Layout");
+            var layoutPath = Path.Combine(_extractPath, "Report", "Layout");
             var layoutContent = System.IO.File.ReadAllText(layoutPath);
-            Directory.Delete(extractPath, true);
+            Directory.Delete(_extractPath, true);
             layoutContent = Regex.Replace(layoutContent, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "");
 
             dynamic fileContents = JsonConvert.DeserializeObject(layoutContent);
 
             DataTable dataTable = new();
-            var columns = new[] { "PageName", "VisualName", "MeasureName", "ColumnName", "DimensionName", "VisualTitle" };
+            List<string> columns =  ["PageName", "VisualName", "MeasureName", "ColumnName", "DimensionName", "VisualTitle"];
             foreach (var column in columns)
                 dataTable.Columns.Add(column, typeof(string));
-
             dataTable.Columns.Add("ReportName", typeof(string)).DefaultValue = Path.GetFileNameWithoutExtension(filePath);
 
             foreach (var section in fileContents.sections)
