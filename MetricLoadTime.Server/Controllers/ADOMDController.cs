@@ -39,7 +39,6 @@ namespace MetricLoadTime.Server.Controllers
         public IActionResult Progress([FromBody] ProgressRequest request)
         {
             _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + request.Username + ";PWD=" + request.Password + "";
-            // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=;UID=;PWD=" + request.Password + "";
             // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
 
             Dictionary<string, DataTable> ReferenceTables = new()
@@ -60,7 +59,7 @@ namespace MetricLoadTime.Server.Controllers
                 {
                     using var connection = new AdomdConnection(_connectionString);
                     ReferenceTables["tableQuery"] = ExecuteDataTable("SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
-                    ["TableName", "TableID"], new AdomdConnection(_connectionString));
+                    ["TableName", "TableID"], connection);
                 }
                 finally { semaphoreReferenceTables.Release(); }
             }));
@@ -71,7 +70,7 @@ namespace MetricLoadTime.Server.Controllers
                 {
                     using var connection = new AdomdConnection(_connectionString);
                     ReferenceTables["columnsQuery"] = ExecuteDataTable("SELECT DISTINCT [TableID], [ExplicitName], [InferredName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
-                    ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], new AdomdConnection(_connectionString));
+                    ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], connection);
                 }
                 finally { semaphoreReferenceTables.Release(); }
             }));
@@ -82,7 +81,7 @@ namespace MetricLoadTime.Server.Controllers
                 {
                     using var connection = new AdomdConnection(_connectionString);
                     ReferenceTables["measureListSQLQuery"] = ExecuteDataTable("SELECT [MEASURE_NAME],[MEASUREGROUP_NAME],[EXPRESSION],[CUBE_NAME] FROM $SYSTEM.MDSCHEMA_MEASURES WHERE MEASURE_IS_VISIBLE AND MEASUREGROUP_NAME <> 'Reporting Filters' ORDER BY [MEASUREGROUP_NAME]",
-                    ["Measure", "MeasureGroup", "Expression", "CubeName"], new AdomdConnection(_connectionString));
+                    ["Measure", "MeasureGroup", "Expression", "CubeName"], connection);
                 }
                 finally { semaphoreReferenceTables.Release(); }
             }));
@@ -93,7 +92,7 @@ namespace MetricLoadTime.Server.Controllers
                 {
                     using var connection = new AdomdConnection(_connectionString);
                     ReferenceTables["measureReferenceQuery"] = ExecuteDataTable("SELECT DISTINCT [Object], [Referenced_Table] FROM $SYSTEM.DISCOVER_CALC_DEPENDENCY WHERE [Object_Type] = 'MEASURE'",
-                    ["Measure", "Referenced_Table"], new AdomdConnection(_connectionString));
+                    ["Measure", "Referenced_Table"], connection);
                 }
                 finally { semaphoreReferenceTables.Release(); }
             }));
@@ -104,7 +103,7 @@ namespace MetricLoadTime.Server.Controllers
                 {
                     using var connection = new AdomdConnection(_connectionString);
                     ReferenceTables["relationshipQuery"] = ExecuteDataTable("SELECT DISTINCT [FromTableID], [FromColumnID], [ToTableID], [ToColumnID] FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS WHERE [IsActive]",
-                    ["FromTableID", "FromColumnID", "ToTableID", "ToColumnID"], new AdomdConnection(_connectionString));
+                    ["FromTableID", "FromColumnID", "ToTableID", "ToColumnID"], connection);
                 }
                 finally { semaphoreReferenceTables.Release(); }
             }));
@@ -136,11 +135,7 @@ namespace MetricLoadTime.Server.Controllers
                 hasDimension = row["hasDimension"]
             });
 
-
-            var response = new Dictionary<string, Object>{
-            { "results", jsonResult }
-            };
-
+            Dictionary<string, Object> response = new() { { "results", jsonResult } };
             return Ok(response);
         }
 
@@ -199,7 +194,7 @@ namespace MetricLoadTime.Server.Controllers
             double loadTime = GetQueryExecutionTime(request.Query, request.UniqueID - 1, _allCombinations, _con);
 
             var jsonResult = _allCombinations.AsEnumerable()
-                .Where(row => Convert.ToInt32(row["UniqueID"]) == request.UniqueID) // Add the filter here
+                .Where(row => Convert.ToInt32(row["UniqueID"]) == request.UniqueID)
                 .Select(row => new
                 {
                     UniqueID = row["UniqueID"],
@@ -217,9 +212,7 @@ namespace MetricLoadTime.Server.Controllers
                     hasDimension = row["hasDimension"]
                 });
 
-
             return Ok(jsonResult);
-            // return Ok(loadTime);
         }
 
         void ExecuteAllQuery(DataTable allQueries)
@@ -231,7 +224,6 @@ namespace MetricLoadTime.Server.Controllers
             {
                 string query = allQueries.Rows[i]["Query"].ToString();
                 int rowIndex = i;
-                // GetQueryExecutionTime(query, rowIndex, allQueries);
                 tasks.Add(Task.Run(async () =>
                 {
                     await semaphore.WaitAsync();
@@ -248,7 +240,6 @@ namespace MetricLoadTime.Server.Controllers
             }
             Task.WhenAll(tasks).Wait();
         }
-
 
         double GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries, dynamic connection)
         {
@@ -284,7 +275,7 @@ namespace MetricLoadTime.Server.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error executing query: {ex.Message}");
-                queryExecutionTime = -1; // Error occurred
+                queryExecutionTime = -1;
             }
             connection.Close();
             connection.Dispose();
@@ -300,8 +291,6 @@ namespace MetricLoadTime.Server.Controllers
             var df1Rows = columnsQuery.AsEnumerable();
             List<Task> tasks = [];
             var semaphore = new SemaphoreSlim(15);
-
-            // Perform inner join using LINQ
             var tableWithColumn = from row1 in dfRows
                                   join row2 in df1Rows
                                   on row1.Field<string>("TableID") equals row2.Field<string>("TableID")
@@ -360,8 +349,6 @@ namespace MetricLoadTime.Server.Controllers
             Task.WhenAll(tasks).Wait();
 
             DataTable RowNumberPerDimension = _allColumnCount;
-
-            // Clone the structure to fix the issue
             DataTable newDataTable = RowNumberPerDimension.Clone();
             foreach (DataRow row in RowNumberPerDimension.Rows) { newDataTable.ImportRow(row); }
             RowNumberPerDimension = newDataTable;
@@ -440,21 +427,17 @@ namespace MetricLoadTime.Server.Controllers
 
         DataTable GetReportData(string filePath)
         {
-            // Extract ZIP file
             var extractPath = Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
             _extractPath = extractPath;
             ZipFile.ExtractToDirectory(filePath, extractPath, true);
 
-            // Clean layout content
             var layoutPath = Path.Combine(extractPath, "Report", "Layout");
             var layoutContent = System.IO.File.ReadAllText(layoutPath);
             Directory.Delete(extractPath, true);
             layoutContent = Regex.Replace(layoutContent, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "");
 
-            // Deserialize layout content
             dynamic fileContents = JsonConvert.DeserializeObject(layoutContent);
 
-            // Initialize DataTable
             DataTable dataTable = new();
             var columns = new[] { "PageName", "VisualName", "MeasureName", "ColumnName", "DimensionName", "VisualTitle" };
             foreach (var column in columns)
@@ -462,7 +445,6 @@ namespace MetricLoadTime.Server.Controllers
 
             dataTable.Columns.Add("ReportName", typeof(string)).DefaultValue = Path.GetFileNameWithoutExtension(filePath);
 
-            // Extract relevant data
             foreach (var section in fileContents.sections)
             {
                 var pageName = section.displayName;
@@ -502,7 +484,6 @@ namespace MetricLoadTime.Server.Controllers
                                 measureList.Add(item.Measure.Property.ToString());
                         }
 
-                        // Insert DataTable rows
                         foreach (var measure in measureList)
                         {
                             var hasColumns = columnList.Count > 0;
@@ -636,7 +617,6 @@ namespace MetricLoadTime.Server.Controllers
             }
             DataTable MeasuresWithoutDimensions = MeasureTimeWithoutDimensions;
 
-            // Add columns with default values directly
             MeasuresWithDimensions.Columns.Add("LoadTime", typeof(string)).DefaultValue = "x";
             MeasuresWithDimensions.Columns.Add("isMeasureUsedInVisual", typeof(string)).DefaultValue = "0";
             MeasuresWithDimensions.Columns.Add("PageName", typeof(string)).DefaultValue = "-";
@@ -675,8 +655,6 @@ namespace MetricLoadTime.Server.Controllers
                 row["hasDimension"] = "0";
             }
 
-
-            // Set default values for parsedDataFrame
             parsedDataFrame.Columns.Add("LoadTime", typeof(string));
             parsedDataFrame.Columns.Add("isMeasureUsedInVisual", typeof(string));
             parsedDataFrame.Columns.Add("hasDimension", typeof(string));
@@ -686,12 +664,9 @@ namespace MetricLoadTime.Server.Controllers
                 row["isMeasureUsedInVisual"] = "1";
                 row["hasDimension"] = "0";
             }
-
-            // Rename columns and add Query column
             parsedDataFrame.Columns["MeasureName"].ColumnName = "Measure";
             parsedDataFrame.Columns.Add("Query", typeof(string)).DefaultValue = ""; ;
 
-            // Populate Query column based on column values
             foreach (DataRow row in parsedDataFrame.Rows)
             {
                 if (row["ColumnName"].ToString() == "")
@@ -704,7 +679,6 @@ namespace MetricLoadTime.Server.Controllers
                 }
             }
 
-            // Group parsedDataFrame by Measure and select the first row of each group
             DataTable tempDF = parsedDataFrame.AsEnumerable()
                 .GroupBy(r => r.Field<string>("Measure"))
                 .Select(g => g.First())
@@ -723,18 +697,18 @@ namespace MetricLoadTime.Server.Controllers
                 DimensionName_x = tempRow?["DimensionName"],
                 ReportName_x = tempRow?["ReportName"],
                 hasDimension_x = tempRow?["hasDimension"],
-                MeasureGroup = measuresRow?["MeasureGroup"], // Add null-conditional operator here
+                MeasureGroup = measuresRow?["MeasureGroup"],
                 EXPRESSION = measuresRow?["EXPRESSION"],
-                Query_y = measuresRow?["Query"],             // Add null-conditional operator here
-                WithDimension = measuresRow?["WithDimension"],// Add null-conditional operator here
-                DimensionName_y = measuresRow?["DimensionName"], // Add null-conditional operator here
-                ColumnName_y = measuresRow?["ColumnName"],   // Add null-conditional operator here
-                LoadTime_y = measuresRow?["LoadTime"],       // Add null-conditional operator here
-                ReportName_y = measuresRow?["ReportName"],   // Add null-conditional operator here
-                hasDimension_y = measuresRow?["hasDimension"] // Add null-conditional operator here
+                Query_y = measuresRow?["Query"],
+                WithDimension = measuresRow?["WithDimension"],
+                DimensionName_y = measuresRow?["DimensionName"],
+                ColumnName_y = measuresRow?["ColumnName"],
+                LoadTime_y = measuresRow?["LoadTime"],
+                ReportName_y = measuresRow?["ReportName"],
+                hasDimension_y = measuresRow?["hasDimension"]
             }
-        );
-            // Merge tempDF with MeasuresWithoutDimensions to find missing measures
+            );
+
             var rightQuery = (
             from measuresRow in MeasuresWithoutDimensions.AsEnumerable()
             join tempRow in tempDF.AsEnumerable()
@@ -748,14 +722,14 @@ namespace MetricLoadTime.Server.Controllers
                 DimensionName_x = tempRow?["DimensionName"],
                 ReportName_x = tempRow?["ReportName"],
                 hasDimension_x = tempRow?["hasDimension"],
-                MeasureGroup = measuresRow?["MeasureGroup"], // Add null-conditional operator here
+                MeasureGroup = measuresRow?["MeasureGroup"],
                 EXPRESSION = measuresRow?["EXPRESSION"],
-                Query_y = measuresRow?["Query"],             // Add null-conditional operator here
-                WithDimension = measuresRow?["WithDimension"],// Add null-conditional operator here
-                DimensionName_y = measuresRow?["DimensionName"], // Add null-conditional operator here
-                ColumnName_y = measuresRow?["ColumnName"],   // Add null-conditional operator here
-                LoadTime_y = measuresRow?["LoadTime"],       // Add null-conditional operator here
-                ReportName_y = measuresRow?["ReportName"],   // Add null-conditional operator here
+                Query_y = measuresRow?["Query"],
+                WithDimension = measuresRow?["WithDimension"],
+                DimensionName_y = measuresRow?["DimensionName"],
+                ColumnName_y = measuresRow?["ColumnName"],
+                LoadTime_y = measuresRow?["LoadTime"],
+                ReportName_y = measuresRow?["ReportName"],
                 hasDimension_y = measuresRow?["hasDimension"]
             }
         );
@@ -766,7 +740,6 @@ namespace MetricLoadTime.Server.Controllers
             mergedDF.Columns["LoadTime_y"].ColumnName = "LoadTime";
             mergedDF.Columns["Query_y"].ColumnName = "Query";
 
-            // Add additional columns to the mergedDF DataTable
             mergedDF.Columns.Add("isMeasureUsedInVisual", typeof(string));
             mergedDF.Columns.Add("PageName", typeof(string));
             mergedDF.Columns.Add("VisualName", typeof(string));
@@ -775,8 +748,6 @@ namespace MetricLoadTime.Server.Controllers
             mergedDF.Columns.Add("DimensionName", typeof(string));
             mergedDF.Columns.Add("hasDimension", typeof(string));
 
-
-            // Assign default values to the additional columns in each row
             foreach (DataRow row in mergedDF.Rows)
             {
                 row["isMeasureUsedInVisual"] = "0";
@@ -788,8 +759,6 @@ namespace MetricLoadTime.Server.Controllers
                 row["hasDimension"] = "0";
             }
 
-
-            // Concatenate parsedDataFrame, mergedDF, and MeasuresWithDimensions
             var possibleCombinations = new DataTable();
             possibleCombinations.Merge(parsedDataFrame);
             possibleCombinations.Merge(mergedDF);
@@ -808,13 +777,10 @@ namespace MetricLoadTime.Server.Controllers
                 "Measure", "DimensionName", "ColumnName", "LoadTime", "PreviousLoadTime", "isMeasureUsedInVisual",
                 "ReportName", "PageName", "VisualName", "VisualTitle", "Query", "hasDimension");
 
-
             return possibleCombinations;
-
         }
 
-
-        void CreateExcelSheet(DataTable dataTable, string ExcelName)
+        static void CreateExcelSheet(DataTable dataTable, string ExcelName)
         {
             var excelFileName = Path.Combine(_extractPath, ExcelName);
             using (var workbook = new XLWorkbook())
@@ -822,7 +788,6 @@ namespace MetricLoadTime.Server.Controllers
                 var worksheet = workbook.Worksheets.Add(dataTable, "Sheet1");
                 workbook.SaveAs(excelFileName);
             }
-
             Console.WriteLine("Saved DataTable to Excel file: " + excelFileName);
         }
 
@@ -831,7 +796,6 @@ namespace MetricLoadTime.Server.Controllers
             connection.Open();
             var command = new AdomdCommand(query, connection);
             var reader = command.ExecuteReader();
-
 
             DataTable dataTable = new();
             for (int i = 0; i < reader.FieldCount; i++)
@@ -874,49 +838,39 @@ namespace MetricLoadTime.Server.Controllers
                 columnList.Add(column);
             }
 
-            // Add rows from the LINQ query result to the DataTable
             foreach (var row in dataRows)
             {
                 DataRow newRow = dataTable.NewRow();
                 foreach (var column in columnList)
                 {
-                    // Access property dynamically using reflection
                     object? columnValue = row.GetType().GetProperty(column)?.GetValue(row);
                     newRow[column] = columnValue != null ? columnValue.ToString() : string.Empty;
                 }
                 dataTable.Rows.Add(newRow);
             }
-
             return dataTable;
-        }
-
-        [HttpGet("sub")]
-        public IActionResult Sub(int number1, int number2)
-        {
-            int result = number1 + number2;
-            return Ok(result);
         }
     }
 
     public class ReloadRequest
     {
         public int UniqueID { get; set; }
-        public string Query { get; set; }
+        public required string Query { get; set; }
     }
 
     public class ProgressRequest
     {
-        public string Username { get; set; }
-        public string Password { get; set; }
+        public required string Username { get; set; }
+        public required string Password { get; set; }
     }
 
     public class AnalyzeRequest
     {
-        public string EndPoint { get; set; }
-        public string ModelName { get; set; }
+        public required string EndPoint { get; set; }
+        public required string ModelName { get; set; }
         public float ThresholdValue { get; set; }
         public int RunningFirstTime { get; set; }
-        public string FilePath { get; set; }
+        public required string FilePath { get; set; }
     }
 
     public class ConnectionsValue
