@@ -7,7 +7,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using System.Collections;
-using DocumentFormat.OpenXml.Office2010.ExcelAc;
 
 namespace MetricLoadTime.Server.Controllers
 {
@@ -19,12 +18,12 @@ namespace MetricLoadTime.Server.Controllers
         private static string? _connectionString;
         private static string _endPoint = "";
         private static string _modelName = "";
-        private static float _thresholdValue = 0;
+        private static float _thresholdValue = 2;
         private static int _runningFirstTime = 1;
         private static string _extractPath = "";
-        private static DataTable? _reportData;
-        private static DataTable? _allCombinations;
-        private static DataTable? _allColumnCount;
+        private static DataTable _reportData;
+        private static DataTable _allCombinations;
+        private static DataTable _allColumnCount;
 
         [HttpPost("analyze")]
         public IActionResult Analyze([FromBody] AnalyzeRequest request)
@@ -34,20 +33,15 @@ namespace MetricLoadTime.Server.Controllers
             _thresholdValue = request.ThresholdValue;
             _runningFirstTime = request.RunningFirstTime;
             _reportData = GetReportData(request.FilePath);
-            Console.WriteLine("", _endPoint);
             return Ok(1);
         }
 
         [HttpPost("progress")]
         public IActionResult Progress([FromBody] ProgressRequest request)
         {
-            // _connectionString = "Provider=MSOLAP.8;Integrated Security=SSPI;Persist Security Info=True;Initial Catalog=f31afe8e-99ed-49b0-a520-2a3f1723eb35;Data Source=localhost:54659;MDX Compatibility=1;Safety Options=2;MDX Missing Member Mode=Error;Update Isolation Level=2";
             _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + request.Username + ";PWD=" + request.Password + "";
             // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=;UID=;PWD=" + request.Password + "";
             // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
-            // _con.GetCloudConnectionAuthenticationProperties();
-            // _con.AccessToken = new AccessToken(token: request.Password, expirationTime: DateTimeOffset.Now.AddHours(2));
-
             _con.ConnectionString = _connectionString;
 
             var tableQuery = ExecuteDataTable(
@@ -186,7 +180,7 @@ namespace MetricLoadTime.Server.Controllers
 
         void ExecuteAllQuery(DataTable allQueries)
         {
-            var semaphore = new SemaphoreSlim(10);
+            var semaphore = new SemaphoreSlim(15);
             List<Task> tasks = [];
 
             for (int i = 0; i < allQueries.Rows.Count; i++)
@@ -209,8 +203,6 @@ namespace MetricLoadTime.Server.Controllers
                 }));
             }
             Task.WhenAll(tasks).Wait();
-
-            CreateExcelSheet(allQueries, "RES.xlsx");
         }
 
 
@@ -237,7 +229,6 @@ namespace MetricLoadTime.Server.Controllers
                 {
                     cancellationTokenSource.Cancel();
                     Console.WriteLine($"Query took too long to execute. Aborting query...");
-
                     queryExecutionTime = _thresholdValue;
                 }
                 else
@@ -263,7 +254,7 @@ namespace MetricLoadTime.Server.Controllers
             var dfRows = tableQuery.AsEnumerable();
             var df1Rows = columnsQuery.AsEnumerable();
             List<Task> tasks = [];
-            var semaphore = new SemaphoreSlim(10);
+            var semaphore = new SemaphoreSlim(15);
 
             // Perform inner join using LINQ
             var tableWithColumn = from row1 in dfRows
@@ -307,13 +298,13 @@ namespace MetricLoadTime.Server.Controllers
                         DataTable tempDF = ExecuteDataTable(query, ["Count"], connection);
                         _allColumnCount.Rows[rowIndex]["Count"] = tempDF.Rows[0]["Count"];
                         _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
-                        Console.WriteLine(rowIndex + " " + _allColumnCount.Rows[rowIndex]["ColumnName"] + " Column Values Count: " + _allColumnCount.Rows[rowIndex]["Count"]);
+                        Console.WriteLine(rowIndex +" "+ _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"]+ ")");
                     }
                     catch
                     {
                         _allColumnCount.Rows[rowIndex]["Count"] = int.MaxValue;
                         _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
-                        Console.WriteLine("Failed Column Values Count " + _allColumnCount.Rows[rowIndex]["ColumnName"]);
+                        Console.WriteLine("Failed !!! "+rowIndex +" "+ _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"]+ ")");
                     }
                     finally
                     {
@@ -399,7 +390,6 @@ namespace MetricLoadTime.Server.Controllers
                     }
                 }
             }
-            CreateExcelSheet(finalColumns, "resultDataFrame.xlsx");
             return finalColumns;
         }
 
@@ -409,11 +399,11 @@ namespace MetricLoadTime.Server.Controllers
             var extractPath = Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
             _extractPath = extractPath;
             ZipFile.ExtractToDirectory(filePath, extractPath, true);
-            Console.WriteLine("Extraction complete");
 
             // Clean layout content
             var layoutPath = Path.Combine(extractPath, "Report", "Layout");
             var layoutContent = System.IO.File.ReadAllText(layoutPath);
+            Directory.Delete(extractPath, true);
             layoutContent = Regex.Replace(layoutContent, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "");
 
             // Deserialize layout content
@@ -484,16 +474,10 @@ namespace MetricLoadTime.Server.Controllers
                             }
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error processing container: {ex.Message}");
-                    }
+                    catch {}
                 }
             }
-
-            // Save DataTable to Excel
-            CreateExcelSheet(dataTable, "dataTable.xlsx");
-            Console.WriteLine("Created Array");
+            Console.WriteLine("Report Extraction Complete");
             return dataTable;
         }
 
@@ -555,8 +539,6 @@ namespace MetricLoadTime.Server.Controllers
 
             DataTable MeasuresWithDimensions = ConvertToDataTable(query);
 
-            CreateExcelSheet(MeasuresWithDimensions, "MeasuresWithDimensions.xlsx");
-
             MeasureTimeWithDimensions.Columns.Add("Measure", typeof(string));
             MeasureTimeWithDimensions.Columns.Add("MeasureGroup", typeof(string));
             MeasureTimeWithDimensions.Columns.Add("EXPRESSION", typeof(string));
@@ -579,12 +561,8 @@ namespace MetricLoadTime.Server.Controllers
                     1
                 );
             }
-            CreateExcelSheet(MeasureTimeWithDimensions, "MeasureTimeWithDimensions.xlsx");
-
-
 
             MeasuresWithDimensions = MeasureTimeWithDimensions;
-
 
             DataTable MeasureTimeWithoutDimensions = new();
             DataTable TempMeasureCalculation = measureListSQLQuery;
@@ -611,12 +589,6 @@ namespace MetricLoadTime.Server.Controllers
                 );
 
             }
-            CreateExcelSheet(MeasureTimeWithoutDimensions, "MeasureTimeWithoutDimensions.xlsx");
-
-
-
-
-
             DataTable MeasuresWithoutDimensions = MeasureTimeWithoutDimensions;
 
             // Add columns with default values directly
@@ -692,12 +664,6 @@ namespace MetricLoadTime.Server.Controllers
                 .GroupBy(r => r.Field<string>("Measure"))
                 .Select(g => g.First())
                 .CopyToDataTable();
-            CreateExcelSheet(tempDF, "tempDF.xlsx");
-
-
-            Console.WriteLine("Done till here.");
-
-
 
             var leftQuery = (
             from tempRow in tempDF.AsEnumerable()
@@ -752,8 +718,6 @@ namespace MetricLoadTime.Server.Controllers
             var finalQuery = leftQuery.Union(rightQuery);
             var mergedDF = ConvertToDataTable(finalQuery);
 
-            CreateExcelSheet(mergedDF, "mergedDF.xlsx");
-
             mergedDF.Columns["LoadTime_y"].ColumnName = "LoadTime";
             mergedDF.Columns["Query_y"].ColumnName = "Query";
 
@@ -799,8 +763,6 @@ namespace MetricLoadTime.Server.Controllers
                 "Measure", "DimensionName", "ColumnName", "LoadTime", "PreviousLoadTime", "isMeasureUsedInVisual",
                 "ReportName", "PageName", "VisualName", "VisualTitle", "Query", "hasDimension");
 
-
-            CreateExcelSheet(possibleCombinations, "possibleCombinations.xlsx");
 
             return possibleCombinations;
 
