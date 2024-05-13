@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using System.Collections;
+using DocumentFormat.OpenXml.Office2010.ExcelAc;
 
 namespace MetricLoadTime.Server.Controllers
 {
@@ -46,14 +47,14 @@ namespace MetricLoadTime.Server.Controllers
             // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
             // _con.GetCloudConnectionAuthenticationProperties();
             // _con.AccessToken = new AccessToken(token: request.Password, expirationTime: DateTimeOffset.Now.AddHours(2));
-            
+
             _con.ConnectionString = _connectionString;
 
             var tableQuery = ExecuteDataTable(
                 "SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
                 ["TableName", "TableID"], _con
             );
-            
+
             var columnsQuery = ExecuteDataTable(
                 "SELECT DISTINCT [TableID], [ExplicitName], [InferredName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
                 ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], _con
@@ -98,7 +99,12 @@ namespace MetricLoadTime.Server.Controllers
                 hasDimension = row["hasDimension"]
             });
 
-            return Ok(jsonResult);
+
+            var response = new Dictionary<string, Object>{
+            { "results", jsonResult }
+            };
+
+            return Ok(response);
         }
 
         [HttpGet("progressBar")]
@@ -154,7 +160,28 @@ namespace MetricLoadTime.Server.Controllers
             _allCombinations.Rows[request.UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[request.UniqueID - 1]["LoadTime"];
             double loadTime = GetQueryExecutionTime(request.Query, request.UniqueID - 1, _allCombinations, _con);
 
-            return Ok(loadTime);
+            var jsonResult = _allCombinations.AsEnumerable()
+                .Where(row => Convert.ToInt32(row["UniqueID"]) == request.UniqueID) // Add the filter here
+                .Select(row => new
+                {
+                    UniqueID = row["UniqueID"],
+                    Measure = row["Measure"],
+                    DimensionName = row["DimensionName"],
+                    ColumnName = row["ColumnName"],
+                    LoadTime = row["LoadTime"],
+                    PreviousLoadTime = row["PreviousLoadTime"],
+                    isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
+                    ReportName = row["ReportName"],
+                    PageName = row["PageName"],
+                    VisualName = row["VisualName"],
+                    VisualTitle = row["VisualTitle"],
+                    Query = row["Query"],
+                    hasDimension = row["hasDimension"]
+                });
+
+
+            return Ok(jsonResult);
+            // return Ok(loadTime);
         }
 
         void ExecuteAllQuery(DataTable allQueries)
@@ -765,7 +792,7 @@ namespace MetricLoadTime.Server.Controllers
             for (int i = 0; i < possibleCombinations.Rows.Count; i++)
             {
                 possibleCombinations.Rows[i]["UniqueID"] = i + 1;
-                possibleCombinations.Rows[i]["PreviousLoadTime"] = "--";
+                possibleCombinations.Rows[i]["PreviousLoadTime"] = "0";
             }
 
             possibleCombinations = possibleCombinations.DefaultView.ToTable(false, "UniqueID",

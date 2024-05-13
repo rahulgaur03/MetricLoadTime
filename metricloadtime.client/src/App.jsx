@@ -7,6 +7,7 @@ import TableComponent from './Components/TableComponent';
 const App = () => {
   const [combinations, setCombinations] = useState({})
   localStorage.setItem('combinations', JSON.stringify(combinations))
+  console.log(combinations)
 
   return (
     <>
@@ -16,7 +17,7 @@ const App = () => {
         </div>
       </nav>
 
-      {combinations.result ? (
+      {combinations.results ? (
         <TableComponent combinations={combinations} />
       ) : (
         <InputComponent setCombinations={setCombinations} />
