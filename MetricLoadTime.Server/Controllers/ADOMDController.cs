@@ -14,7 +14,6 @@ namespace MetricLoadTime.Server.Controllers
     [Route("api/[controller]")]
     public class ADOMDController : ControllerBase
     {
-        private readonly static AdomdConnection _con = new();
         private static string? _connectionString;
         private static string _endPoint = "";
         private static string _modelName = "";
@@ -42,37 +41,81 @@ namespace MetricLoadTime.Server.Controllers
             _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + request.Username + ";PWD=" + request.Password + "";
             // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=;UID=;PWD=" + request.Password + "";
             // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
-            _con.ConnectionString = _connectionString;
 
-            var tableQuery = ExecuteDataTable(
-                "SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
-                ["TableName", "TableID"], _con
-            );
+            Dictionary<string, DataTable> ReferenceTables = new()
+            {
+            {"tableQuery", null},
+            {"columnsQuery", null},
+            {"measureListSQLQuery", null},
+            {"measureReferenceQuery", null},
+            {"relationshipQuery", null}
+            };
 
-            var columnsQuery = ExecuteDataTable(
-                "SELECT DISTINCT [TableID], [ExplicitName], [InferredName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
-                ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], _con
-            );
+            var semaphoreReferenceTables = new SemaphoreSlim(5);
+            List<Task> tasksReferenceTables = [];
 
-            var measureListSQLQuery = ExecuteDataTable(
-                "SELECT [MEASURE_NAME],[MEASUREGROUP_NAME],[EXPRESSION],[CUBE_NAME] FROM $SYSTEM.MDSCHEMA_MEASURES WHERE MEASURE_IS_VISIBLE AND MEASUREGROUP_NAME <> 'Reporting Filters' ORDER BY [MEASUREGROUP_NAME]",
-                ["Measure", "MeasureGroup", "Expression", "CubeName"], _con
-            );
+            tasksReferenceTables.Add(Task.Run(async () =>
+            {
+                await semaphoreReferenceTables.WaitAsync(); try
+                {
+                    using var connection = new AdomdConnection(_connectionString);
+                    ReferenceTables["tableQuery"] = ExecuteDataTable("SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
+                    ["TableName", "TableID"], new AdomdConnection(_connectionString));
+                }
+                finally { semaphoreReferenceTables.Release(); }
+            }));
 
-            var measureReferenceQuery = ExecuteDataTable(
-                "SELECT DISTINCT [Object], [Referenced_Table] FROM $SYSTEM.DISCOVER_CALC_DEPENDENCY WHERE [Object_Type] = 'MEASURE'",
-                ["Measure", "Referenced_Table"], _con
-            );
+            tasksReferenceTables.Add(Task.Run(async () =>
+            {
+                await semaphoreReferenceTables.WaitAsync(); try
+                {
+                    using var connection = new AdomdConnection(_connectionString);
+                    ReferenceTables["columnsQuery"] = ExecuteDataTable("SELECT DISTINCT [TableID], [ExplicitName], [InferredName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
+                    ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], new AdomdConnection(_connectionString));
+                }
+                finally { semaphoreReferenceTables.Release(); }
+            }));
 
-            var relationshipQuery = ExecuteDataTable(
-                "SELECT DISTINCT [FromTableID], [FromColumnID], [ToTableID], [ToColumnID] FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS WHERE [IsActive]",
-                ["FromTableID", "FromColumnID", "ToTableID", "ToColumnID"], _con
-            );
+            tasksReferenceTables.Add(Task.Run(async () =>
+            {
+                await semaphoreReferenceTables.WaitAsync(); try
+                {
+                    using var connection = new AdomdConnection(_connectionString);
+                    ReferenceTables["measureListSQLQuery"] = ExecuteDataTable("SELECT [MEASURE_NAME],[MEASUREGROUP_NAME],[EXPRESSION],[CUBE_NAME] FROM $SYSTEM.MDSCHEMA_MEASURES WHERE MEASURE_IS_VISIBLE AND MEASUREGROUP_NAME <> 'Reporting Filters' ORDER BY [MEASUREGROUP_NAME]",
+                    ["Measure", "MeasureGroup", "Expression", "CubeName"], new AdomdConnection(_connectionString));
+                }
+                finally { semaphoreReferenceTables.Release(); }
+            }));
 
-            foreach (DataRow row in columnsQuery.Rows) row["ColumnName"] = string.IsNullOrWhiteSpace(row["ColumnName"]?.ToString()) ? row["InferredColumnName"]?.ToString() : row["ColumnName"]?.ToString();
-            columnsQuery.Columns.Remove("InferredColumnName");
-            var finalColumns = GetFinalColumns(tableQuery, columnsQuery);
-            _allCombinations = GetAllCombination(measureListSQLQuery, measureReferenceQuery, relationshipQuery, tableQuery, finalColumns, columnsQuery);
+            tasksReferenceTables.Add(Task.Run(async () =>
+            {
+                await semaphoreReferenceTables.WaitAsync(); try
+                {
+                    using var connection = new AdomdConnection(_connectionString);
+                    ReferenceTables["measureReferenceQuery"] = ExecuteDataTable("SELECT DISTINCT [Object], [Referenced_Table] FROM $SYSTEM.DISCOVER_CALC_DEPENDENCY WHERE [Object_Type] = 'MEASURE'",
+                    ["Measure", "Referenced_Table"], new AdomdConnection(_connectionString));
+                }
+                finally { semaphoreReferenceTables.Release(); }
+            }));
+
+            tasksReferenceTables.Add(Task.Run(async () =>
+            {
+                await semaphoreReferenceTables.WaitAsync(); try
+                {
+                    using var connection = new AdomdConnection(_connectionString);
+                    ReferenceTables["relationshipQuery"] = ExecuteDataTable("SELECT DISTINCT [FromTableID], [FromColumnID], [ToTableID], [ToColumnID] FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS WHERE [IsActive]",
+                    ["FromTableID", "FromColumnID", "ToTableID", "ToColumnID"], new AdomdConnection(_connectionString));
+                }
+                finally { semaphoreReferenceTables.Release(); }
+            }));
+
+
+            Task.WhenAll(tasksReferenceTables).Wait();
+
+            foreach (DataRow row in ReferenceTables["columnsQuery"].Rows) row["ColumnName"] = string.IsNullOrWhiteSpace(row["ColumnName"]?.ToString()) ? row["InferredColumnName"]?.ToString() : row["ColumnName"]?.ToString();
+            ReferenceTables["columnsQuery"].Columns.Remove("InferredColumnName");
+            var finalColumns = GetFinalColumns(ReferenceTables["tableQuery"], ReferenceTables["columnsQuery"]);
+            _allCombinations = GetAllCombination(ReferenceTables["measureListSQLQuery"], ReferenceTables["measureReferenceQuery"], ReferenceTables["relationshipQuery"], ReferenceTables["tableQuery"], finalColumns, ReferenceTables["columnsQuery"]);
 
             Task.Run(() => ExecuteAllQuery(_allCombinations));
 
@@ -152,6 +195,7 @@ namespace MetricLoadTime.Server.Controllers
         public IActionResult Reload([FromBody] ReloadRequest request)
         {
             _allCombinations.Rows[request.UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[request.UniqueID - 1]["LoadTime"];
+            AdomdConnection _con = new(_connectionString);
             double loadTime = GetQueryExecutionTime(request.Query, request.UniqueID - 1, _allCombinations, _con);
 
             var jsonResult = _allCombinations.AsEnumerable()
@@ -242,7 +286,8 @@ namespace MetricLoadTime.Server.Controllers
                 Console.WriteLine($"Error executing query: {ex.Message}");
                 queryExecutionTime = -1; // Error occurred
             }
-            _con.Close();
+            connection.Close();
+            connection.Dispose();
             Console.WriteLine($"Query: {query}\nExecution time:{queryExecutionTime}");
             allQueries.Rows[rowIndex]["LoadTime"] = queryExecutionTime;
             return queryExecutionTime;
@@ -298,13 +343,13 @@ namespace MetricLoadTime.Server.Controllers
                         DataTable tempDF = ExecuteDataTable(query, ["Count"], connection);
                         _allColumnCount.Rows[rowIndex]["Count"] = tempDF.Rows[0]["Count"];
                         _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
-                        Console.WriteLine(rowIndex +" "+ _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"]+ ")");
+                        Console.WriteLine(rowIndex + " " + _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"] + ")");
                     }
                     catch
                     {
                         _allColumnCount.Rows[rowIndex]["Count"] = int.MaxValue;
                         _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
-                        Console.WriteLine("Failed !!! "+rowIndex +" "+ _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"]+ ")");
+                        Console.WriteLine("Failed !!! " + rowIndex + " " + _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"] + ")");
                     }
                     finally
                     {
@@ -474,7 +519,7 @@ namespace MetricLoadTime.Server.Controllers
                             }
                         }
                     }
-                    catch {}
+                    catch { }
                 }
             }
             Console.WriteLine("Report Extraction Complete");
@@ -806,6 +851,7 @@ namespace MetricLoadTime.Server.Controllers
             }
 
             connection.Close();
+            connection.Dispose();
 
             return dataTable;
         }
