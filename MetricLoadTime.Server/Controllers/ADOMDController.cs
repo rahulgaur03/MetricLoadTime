@@ -223,13 +223,14 @@ namespace MetricLoadTime.Server.Controllers
             for (int i = 0; i < allQueries.Rows.Count; i++)
             {
                 string query = allQueries.Rows[i]["Query"].ToString();
+                int rowIndex = i;
                 tasks.Add(Task.Run(async () =>
                 {
                     await semaphore.WaitAsync();
                     try
                     {
                         using var connection = new AdomdConnection(_connectionString);
-                        GetQueryExecutionTime(query, i, allQueries, connection);
+                        GetQueryExecutionTime(query, rowIndex, allQueries, connection);
                     }
                     finally
                     {
@@ -240,7 +241,7 @@ namespace MetricLoadTime.Server.Controllers
             Task.WhenAll(tasks).Wait();
         }
 
-        static void GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries, dynamic connection)
+        void GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries, dynamic connection)
         {
             connection.Open();
             var command = new AdomdCommand(query, connection);
