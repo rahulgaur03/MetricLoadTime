@@ -7,6 +7,14 @@ import TableComponent from './Components/TableComponent';
 const App = () => {
   const [combinations, setCombinations] = useState({})
   localStorage.setItem('combinations', JSON.stringify(combinations))
+  const [inputs, setInputs] = useState({
+    filePath: '',
+    modelName: '',
+    xmlaEndpoint: '',
+    thresholdValue: '',
+    runningForFirstTime: 0,
+  });  
+  
   console.log(combinations)
 
   return (
@@ -18,9 +26,9 @@ const App = () => {
       </nav>
 
       {combinations.results ? (
-        <TableComponent combinations={combinations} />
+        <TableComponent combinations={combinations} modelName = {inputs.modelName} thresholdValue = {inputs.thresholdValue} />
       ) : (
-        <InputComponent setCombinations={setCombinations} />
+        <InputComponent setCombinations={setCombinations} inputs={inputs} setInputs={setInputs} />
       )}
       {/* <div style={{ backgroundImage: `url(${backgroundSVG})`, backgroundSize : 'content', height: '100vh'}}> */}
       {/* ASDF */}

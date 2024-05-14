@@ -5,7 +5,7 @@ import axios from 'axios';
 
 import Modal from 'react-bootstrap/Modal';
 
-const InputComponent = ({ setCombinations }) => {
+const InputComponent = ({ setCombinations, inputs,setInputs }) => {
 
 
 
@@ -20,13 +20,7 @@ const InputComponent = ({ setCombinations }) => {
 
 
 
-  const [inputs, setInputs] = useState({
-    filePath: '',
-    modelName: '',
-    xmlaEndpoint: '',
-    thresholdValue: '',
-    runningForFirstTime: 0,
-  });
+
 
 
   const [email, setEmail] = useState("")
