@@ -15,7 +15,14 @@ app.UseCors(policy =>
           .AllowAnyMethod();
 });
 
-await Electron.WindowManager.CreateWindowAsync();
+var browserWindowOptions = new BrowserWindowOptions
+{
+    AutoHideMenuBar = true ,
+    Width = 1400,
+    Height = 1000,
+};
+
+await Electron.WindowManager.CreateWindowAsync(browserWindowOptions);
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
