@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using System.Collections;
+using OfficeOpenXml;
 
 namespace MetricLoadTime.Server.Controllers
 {
@@ -15,14 +16,16 @@ namespace MetricLoadTime.Server.Controllers
     public class ADOMDController : ControllerBase
     {
         private static string? _connectionString;
+        private static string _downloadFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Documents";
+        private static string? _reportName;
         private static string _endPoint = "";
         private static string _modelName = "";
         private static float _thresholdValue = 2;
-        private static int _runningFirstTime = 1;
-        private static string _extractPath = "";
+        private static int _isPreviousRunResultsExist = 0;
         private static DataTable _reportData;
         private static DataTable _allCombinations;
         private static DataTable _allColumnCount;
+        private static DataTable _previousRunResults;
 
         [HttpPost("analyze")]
         public IActionResult Analyze([FromBody] AnalyzeRequest request)
@@ -30,7 +33,6 @@ namespace MetricLoadTime.Server.Controllers
             _endPoint = request.EndPoint;
             _modelName = request.ModelName;
             _thresholdValue = request.ThresholdValue;
-            _runningFirstTime = request.RunningFirstTime;
             _reportData = GetReportData(request.FilePath);
             return Ok(1);
         }
@@ -116,6 +118,31 @@ namespace MetricLoadTime.Server.Controllers
             var finalColumns = GetFinalColumns(ReferenceTables["tableQuery"], ReferenceTables["columnsQuery"]);
             _allCombinations = GetAllCombination(ReferenceTables["measureListSQLQuery"], ReferenceTables["measureReferenceQuery"], ReferenceTables["relationshipQuery"], ReferenceTables["tableQuery"], finalColumns, ReferenceTables["columnsQuery"]);
 
+            if (_isPreviousRunResultsExist == 1)
+            {
+                _allCombinations = ConvertToDataTable(
+                    from row1 in _allCombinations.AsEnumerable()
+                    join row2 in _previousRunResults.AsEnumerable()
+                    on row1.Field<string>("Query") equals row2.Field<string>("Query")
+                    select new
+                    {
+                        UniqueID = row1.Field<int>("UniqueID"),
+                        Measure = row1.Field<string>("Measure"),
+                        DimensionName = row1.Field<string>("DimensionName"),
+                        ColumnName = row1.Field<string>("ColumnName"),
+                        LoadTime = row1.Field<string>("LoadTime"),
+                        PreviousLoadTime = row2.Field<string>("LoadTime"),
+                        isMeasureUsedInVisual = row1.Field<string>("isMeasureUsedInVisual"),
+                        ReportName = row1.Field<string>("ReportName"),
+                        PageName = row1.Field<string>("PageName"),
+                        VisualName = row1.Field<string>("VisualName"),
+                        VisualTitle = row1.Field<string>("VisualTitle"),
+                        Query = row1.Field<string>("Query"),
+                        hasDimension = row1.Field<string>("hasDimension")
+                    }
+                );
+            }
+
             Task.Run(() => ExecuteAllQuery(_allCombinations));
 
             var jsonResult = _allCombinations.AsEnumerable().Select(row => new
@@ -186,13 +213,6 @@ namespace MetricLoadTime.Server.Controllers
             return Ok(jsonResult);
         }
 
-        [HttpGet("export")]
-        public IActionResult Export()
-        {
-            CreateExcelSheet(_allCombinations, $"{_modelName} Result.xlsx");
-            return Ok(1);
-        }
-
         [HttpPost("reload")]
         public IActionResult Reload([FromBody] ReloadRequest request)
         {
@@ -218,6 +238,8 @@ namespace MetricLoadTime.Server.Controllers
                     Query = row["Query"],
                     hasDimension = row["hasDimension"]
                 });
+
+            CreateExcelSheet(_allCombinations, $"{_downloadFolderPath}\\MetricLoadTime\\{_modelName}\\{_reportName}.xlsx");
 
             return Ok(jsonResult);
         }
@@ -246,6 +268,7 @@ namespace MetricLoadTime.Server.Controllers
                 }));
             }
             Task.WhenAll(tasks).Wait();
+            CreateExcelSheet(allQueries, $"{_downloadFolderPath}\\MetricLoadTime\\{_modelName}\\{_reportName}.xlsx");
         }
 
         void GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries, dynamic connection)
@@ -427,18 +450,20 @@ namespace MetricLoadTime.Server.Controllers
 
         DataTable GetReportData(string filePath)
         {
-            _extractPath = Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
-            ZipFile.ExtractToDirectory(filePath, _extractPath, true);
 
-            var layoutPath = Path.Combine(_extractPath, "Report", "Layout");
+            _reportName = Path.GetFileNameWithoutExtension(filePath);
+            string extractPath = Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
+            ZipFile.ExtractToDirectory(filePath, extractPath, true);
+
+            var layoutPath = Path.Combine(extractPath, "Report", "Layout");
             var layoutContent = System.IO.File.ReadAllText(layoutPath);
-            Directory.Delete(_extractPath, true);
+            Directory.Delete(extractPath, true);
             layoutContent = Regex.Replace(layoutContent, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "");
 
             dynamic fileContents = JsonConvert.DeserializeObject(layoutContent);
 
             DataTable dataTable = new();
-            List<string> columns =  ["PageName", "VisualName", "MeasureName", "ColumnName", "DimensionName", "VisualTitle"];
+            List<string> columns = ["PageName", "VisualName", "MeasureName", "ColumnName", "DimensionName", "VisualTitle"];
             foreach (var column in columns)
                 dataTable.Columns.Add(column, typeof(string));
             dataTable.Columns.Add("ReportName", typeof(string)).DefaultValue = Path.GetFileNameWithoutExtension(filePath);
@@ -501,7 +526,19 @@ namespace MetricLoadTime.Server.Controllers
                     catch { }
                 }
             }
-            Console.WriteLine("Report Extraction Complete");
+
+            string _filePathpreviousRunResults = $"{_downloadFolderPath}\\MetricLoadTime\\{_modelName}\\{_reportName}.xlsx";
+            if (System.IO.File.Exists(_filePathpreviousRunResults))
+            {
+                using ExcelPackage package = new(new System.IO.FileInfo(_filePathpreviousRunResults));
+                var ws = package.Workbook.Worksheets[0];
+                var dt = new DataTable();
+                foreach (var firstRowCell in ws.Cells[1, 1, 1, ws.Dimension.End.Column]) dt.Columns.Add(firstRowCell.Text.Trim());
+                for (int rowNum = 2; rowNum <= ws.Dimension.End.Row; rowNum++) dt.Rows.Add(ws.Cells[rowNum, 1, rowNum, ws.Dimension.End.Column].Select(cell => cell.Text.Trim()).ToArray());
+                _previousRunResults = dt;
+                _isPreviousRunResultsExist = 1;
+            }
+
             return dataTable;
         }
 
@@ -778,15 +815,14 @@ namespace MetricLoadTime.Server.Controllers
             return possibleCombinations;
         }
 
-        static void CreateExcelSheet(DataTable dataTable, string ExcelName)
+        static void CreateExcelSheet(DataTable dataTable, string excelName)
         {
-            var excelFileName = Path.Combine(_extractPath, ExcelName);
             using (var workbook = new XLWorkbook())
             {
                 var worksheet = workbook.Worksheets.Add(dataTable, "Sheet1");
-                workbook.SaveAs(excelFileName);
+                workbook.SaveAs(excelName);
             }
-            Console.WriteLine("Saved DataTable to Excel file: " + excelFileName);
+            Console.WriteLine("Saved DataTable to Excel file: " + excelName);
         }
 
         DataTable ExecuteDataTable(string query, List<string> columnsList, dynamic connection)
@@ -869,11 +905,5 @@ namespace MetricLoadTime.Server.Controllers
         public float ThresholdValue { get; set; }
         public int RunningFirstTime { get; set; }
         public required string FilePath { get; set; }
-    }
-
-    public class ConnectionsValue
-    {
-        public int Number1 { get; set; }
-        public int Number2 { get; set; }
     }
 }
