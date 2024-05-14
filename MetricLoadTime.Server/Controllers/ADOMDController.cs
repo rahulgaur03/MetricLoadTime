@@ -186,6 +186,13 @@ namespace MetricLoadTime.Server.Controllers
             return Ok(jsonResult);
         }
 
+        [HttpGet("export")]
+        public IActionResult Export()
+        {
+            CreateExcelSheet(_allCombinations, $"{_modelName} Result.xlsx");
+            return Ok(1);
+        }
+
         [HttpPost("reload")]
         public IActionResult Reload([FromBody] ReloadRequest request)
         {
