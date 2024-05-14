@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 // import DetailedTable from './DetailedTable';
 import Example from './DetailedTable';
+import './TableComponent.css';
 
 const TableComponent = ({ combinations }) => {
     const [view, setView] = useState('detail');
@@ -13,12 +14,12 @@ const TableComponent = ({ combinations }) => {
                 <div className="innercontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
                     <div className="tabs border-bottom d-flex">
                         <div className="detailmodel">
-                            <button type="button" className={view === 'detail' ? 'btn btn-danger' : 'btn'} onClick={() => setView('detail')}>
+                            <button type="button" className={view === 'detail' ? 'btn detail' : 'btn'} onClick={() => setView('detail')}>
                                 Detail
                             </button>
                         </div>
                         <div className="summarymodel mx-1">
-                            <button type="button" className={view === 'summary' ? 'btn btn-danger' : 'btn'} onClick={() => setView('summary')}>
+                            <button type="button" className={view === 'summary' ? 'btn detail' : 'btn'} onClick={() => setView('summary')}>
                                 Summary
                             </button>
                         </div>

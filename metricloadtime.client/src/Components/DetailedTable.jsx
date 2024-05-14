@@ -165,11 +165,18 @@ import {
 } from 'material-react-table';
 import axios from "axios";
 
+// import {
+//   Box,
+// } from '@mui/material';
+import CircularProgress from '@mui/material/CircularProgress';
+
 
 const Example = ({combinations}) => {
 
   const [initialcombinations, setinitialcombinations] = useState(combinations.results);
   const [rowSelection, setRowSelection] = useState({});
+
+  const [genereatedLoadTimes, setGenereatedLoadTimes] = useState(0)
 
   console.log(initialcombinations)
 
@@ -251,6 +258,10 @@ const handleReload = () =>
     }
   }, 5000); // Adjust polling interval as needed
 
+  useEffect(() => {
+    const countX = initialcombinations.filter(obj => obj.loadTime != 'x').length;
+    setGenereatedLoadTimes(countX)
+  }, [initialcombinations])
 
 
 const columns = useMemo(
@@ -270,6 +281,19 @@ const columns = useMemo(
       {
         accessorKey: 'loadTime',
         header: 'Load Time',
+        Cell: ({ cell }) => (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            {/* using renderedCellValue instead of cell.getValue() preserves filter match highlighting */}
+            {cell.getValue() == 'x' ? <CircularProgress /> : <span>{cell.getValue()}</span>  }
+          
+          </Box>
+        ),
       },
       {
         accessorKey: 'previousLoadTime',
@@ -317,8 +341,16 @@ const columns = useMemo(
   // }, [rowSelection]);
 
   return(
-  <div>
-    <button type="button" class="btn btn-danger" onClick={handleReload} >Reload</button>
+    <div>
+    <div className = 'd-flex justify-content-between'>
+    <div>
+        <b>
+           Generated Load Times {genereatedLoadTimes}/{initialcombinations.length}
+          </b>
+      </div>
+      <button type="button" class="btn btn-danger" onClick={handleReload} style={{height : "fit-content"}} >Reload</button>
+      
+    </div>
 
     <MaterialReactTable table={table} />;
   </div>

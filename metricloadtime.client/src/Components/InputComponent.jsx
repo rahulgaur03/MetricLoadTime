@@ -181,6 +181,7 @@ const InputComponent = ({ setCombinations }) => {
       }
     }, 2000); // Adjust polling interval as needed
   };
+  const hasInputValues = Object.values(inputs).some(value => value !== '');
 
 
   //   return (
@@ -195,15 +196,15 @@ const InputComponent = ({ setCombinations }) => {
     <>
 
       <div className="container mt-5 border">
-        <div className="innercontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
+        <div className="innercontainer tabcontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
           <div className="tabs border-bottom d-flex">
             <div className="powerbimodel">
-              <button type="button" className={model === 'powerbi' ? 'btn btn-danger' : 'btn'} onClick={() => handleModelClick('powerbi')}>
+              <button type="button" className={model === 'powerbi' ? 'btn inputselectedbutton' : 'btn inputunselectedbutton'} onClick={() => handleModelClick('powerbi')}>
                 Power BI Model
               </button>
             </div>
             <div className="tabularmodel mx-1">
-              <button type="button" className={model === 'tabular' ? 'btn btn-danger' : 'btn'} onClick={() => handleModelClick('tabular')}>
+              <button type="button" className={model === 'tabular' ? 'btn inputselectedbutton' : 'btn inputunselectedbutton'} onClick={() => handleModelClick('tabular')}>
                 Tabular Model
               </button>
             </div>
@@ -307,15 +308,15 @@ const InputComponent = ({ setCombinations }) => {
           </div>
         </div>
 
-        <div className="innercontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
+        <div className="buttoncontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
           <div className="tabs d-flex justify-content-end">
             <div className="powerbimodel">
-              <button type="button" className="btn btn-danger" onClick={() => handleResetClick()}>
-                Reset
+              <button type="button" className="resetbutton btn" onClick={() => handleResetClick()}>
+              ↻ Reset
               </button>
             </div>
             <div className="tabularmodel mx-1">
-              <button type="button" className="btn btn-danger" onClick={() => analyze()}>
+              <button type="button" className="btn btn-danger analyzebutton" onClick={() => analyze()}>
                 Analyze
               </button>
               {/* {popoverVisible ? ( */}
@@ -354,7 +355,7 @@ const InputComponent = ({ setCombinations }) => {
                       <p>Generating column query data for analysis...</p>
                     </div> : <div className="modal-body">
                       <div className="progress" role="progressbar" aria-label="Basic example" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
-                        <div className="progress-bar" style={{ width: (progress.Progress / progress.Total) * 100 + "%" }}></div>
+                        <div className="progress-bar progress-bar-striped bg-danger progress-bar-animated" style={{ width: (progress.Progress / progress.Total) * 100 + "%" }}></div>
                       </div>
                       <p>{progress.Progress}/{progress.Total} Completed</p>
                     </div>
