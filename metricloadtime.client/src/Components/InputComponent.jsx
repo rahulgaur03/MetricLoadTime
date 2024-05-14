@@ -5,7 +5,7 @@ import axios from 'axios';
 
 import Modal from 'react-bootstrap/Modal';
 
-const InputComponent = ({ setCombinations }) => {
+const InputComponent = ({ setCombinations, inputs,setInputs }) => {
 
 
 
@@ -20,13 +20,7 @@ const InputComponent = ({ setCombinations }) => {
 
 
 
-  const [inputs, setInputs] = useState({
-    filePath: '',
-    modelName: '',
-    xmlaEndpoint: '',
-    thresholdValue: '',
-    runningForFirstTime: 0,
-  });
+
 
 
   const [email, setEmail] = useState("")
@@ -181,6 +175,7 @@ const InputComponent = ({ setCombinations }) => {
       }
     }, 2000); // Adjust polling interval as needed
   };
+  const hasInputValues = Object.values(inputs).some(value => value !== '');
 
 
   //   return (
@@ -195,15 +190,15 @@ const InputComponent = ({ setCombinations }) => {
     <>
 
       <div className="container mt-5 border">
-        <div className="innercontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
+        <div className="innercontainer modeltabcontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
           <div className="tabs border-bottom d-flex">
             <div className="powerbimodel">
-              <button type="button" className={model === 'powerbi' ? 'btn btn-danger' : 'btn'} onClick={() => handleModelClick('powerbi')}>
+              <button type="button" className={model === 'powerbi' ? 'btn inputselectedbutton' : 'btn inputunselectedbutton'} onClick={() => handleModelClick('powerbi')}>
                 Power BI Model
               </button>
             </div>
             <div className="tabularmodel mx-1">
-              <button type="button" className={model === 'tabular' ? 'btn btn-danger' : 'btn'} onClick={() => handleModelClick('tabular')}>
+              <button type="button" className={model === 'tabular' ? 'btn inputselectedbutton' : 'btn inputunselectedbutton'} onClick={() => handleModelClick('tabular')}>
                 Tabular Model
               </button>
             </div>
@@ -307,15 +302,15 @@ const InputComponent = ({ setCombinations }) => {
           </div>
         </div>
 
-        <div className="innercontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
+        <div className="buttoncontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
           <div className="tabs d-flex justify-content-end">
             <div className="powerbimodel">
-              <button type="button" className="btn btn-danger" onClick={() => handleResetClick()}>
-                Reset
+              <button type="button" className="resetbutton btn" onClick={() => handleResetClick()}>
+              ↻ Reset
               </button>
             </div>
             <div className="tabularmodel mx-1">
-              <button type="button" className="btn btn-danger" onClick={() => analyze()}>
+              <button type="button" className="btn btn-danger analyzebutton" onClick={() => analyze()}>
                 Analyze
               </button>
               {/* {popoverVisible ? ( */}
@@ -352,20 +347,18 @@ const InputComponent = ({ setCombinations }) => {
                   {
                     (progress.Total) === 0 ? <div className="modal-body">
                       <p>Generating column query data for analysis...</p>
-                    </div> : <div className="modal-body">
+                    </div> : <div className="modal-body d-flex flex-column justify-content-center">
                       <div className="progress" role="progressbar" aria-label="Basic example" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
-                        <div className="progress-bar" style={{ width: (progress.Progress / progress.Total) * 100 + "%" }}></div>
+                        <div className="progress-bar progress-bar-striped bg-danger progress-bar-animated" style={{ width: (progress.Progress / progress.Total) * 100 + "%" }}></div>
                       </div>
-                      <p>{progress.Progress}/{progress.Total} Completed</p>
+                      <div className='align-self-center'>
+                        <b> <span style={{color : "#A31619"}}>
+                         {parseInt((progress.Progress / progress.Total) * 100)}% </span> Completed</b>
+                      </div>
                     </div>
                   }
 
                 </Modal.Body>
-                <Modal.Footer>
-                  {/* <Button variant="primary" onClick={handleClose}>
-                  Close
-                </Button> */}
-                </Modal.Footer>
               </Modal>
 
 
@@ -391,7 +384,7 @@ const InputComponent = ({ setCombinations }) => {
                       <label for="exampleInputPassword1" class="form-label">Password</label>
                       <input type="password" class="form-control" id="exampleInputPassword1" onChange={handlepassword} />
                     </div>
-                    <button type="submit" class="btn btn-primary" onClick={login} >Submit</button>
+                    <button type="submit" class="btn btn-primary" style={{backgroundColor : "#A31619"}} onClick={login} >Log In</button>
                   </div>
                 </Modal.Body>
                 <Modal.Footer>

@@ -60,3 +60,134 @@
   .MuiDataGrid-cell--textLeft{
     font-size: "1px" !important;
   }
+
+
+.detail{
+  background-color: #A31619;
+  color: white;
+  font-weight: 600;
+  height: 31px;
+  text-align: center;
+  padding: revert;
+  width: 77px;
+  border-radius: 4px;
+}
+
+
+.inputselectedbutton{
+  background-color: #A31619 !important;
+  color: white !important;
+  font-weight: 600 !important;
+  height: 31px;
+  text-align: center !important;
+  padding: revert !important;
+  width: 139px;
+  border-radius: 4px !important;
+}
+
+
+.inputunselectedbutton{
+  height: 31px;
+  text-align: center !important;
+  padding: revert !important;
+  width: 139px;
+}
+
+
+.resetbutton{
+  width: 10vw;
+  border-radius: 4px !important;
+  font-weight: 600 !important; 
+  background-color: grey !important;
+  color: white !important;
+}
+
+.resetbutton:hover{
+  font-weight: 600; 
+  background-color: #A31619 !important;
+  color: white;
+}
+
+.analyzebutton{
+  width: 10vw;
+  border-radius: 4px !important;
+  font-weight: 600 !important; 
+  background-color: #A31619 !important;
+   color: white !important;
+}
+
+.analyzebutton:hover{
+  width: 10vw;
+  border-radius: 4px !important;
+  font-weight: 600 !important; 
+  background-color: #74080a !important;
+   color: white !important;
+}
+
+.modeltabcontainer{
+  width : 95% !important;
+}
+
+.inputs{
+  width : 90% !important;
+}
+
+.buttoncontainer{
+  width : 93% !important;
+}
+
+
+.loadtimeprogress{
+  width: 20px !important;
+  height: 20px !important;
+  color : #A31619 !important;
+}
+
+.tabcontainer{
+  width : 98% !important;
+  padding-left: 0px !important;
+}
+
+
+.exportbtn{
+  border: none;
+    border-radius: 3px;
+    padding: 2px;
+    width : 100px;
+    height : 31px
+    /* margin-right :  */
+}
+
+.exportbtn:hover{
+  background-color: #A31619 !important;
+   color: white !important;
+}
+
+
+.card {
+  /* border: 1px solid black; */
+  width: 332px;
+  
+}
+
+.total_measures {
+  background-color: #e5e5e5;
+}
+.combinations_below_threshold {
+  background-color: #cdf1ef;
+}
+.combinations_above_threshold {
+  background-color: #fed5c3;
+}
+
+.cards {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.card-body{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
