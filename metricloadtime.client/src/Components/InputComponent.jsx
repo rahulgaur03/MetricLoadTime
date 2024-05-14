@@ -196,7 +196,7 @@ const InputComponent = ({ setCombinations }) => {
     <>
 
       <div className="container mt-5 border">
-        <div className="innercontainer tabcontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
+        <div className="innercontainer modeltabcontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
           <div className="tabs border-bottom d-flex">
             <div className="powerbimodel">
               <button type="button" className={model === 'powerbi' ? 'btn inputselectedbutton' : 'btn inputunselectedbutton'} onClick={() => handleModelClick('powerbi')}>
@@ -353,20 +353,18 @@ const InputComponent = ({ setCombinations }) => {
                   {
                     (progress.Total) === 0 ? <div className="modal-body">
                       <p>Generating column query data for analysis...</p>
-                    </div> : <div className="modal-body">
+                    </div> : <div className="modal-body d-flex flex-column justify-content-center">
                       <div className="progress" role="progressbar" aria-label="Basic example" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
                         <div className="progress-bar progress-bar-striped bg-danger progress-bar-animated" style={{ width: (progress.Progress / progress.Total) * 100 + "%" }}></div>
                       </div>
-                      <p>{progress.Progress}/{progress.Total} Completed</p>
+                      <div className='align-self-center'>
+                        <b> <span style={{color : "#A31619"}}>
+                         {parseInt((progress.Progress / progress.Total) * 100)}% </span> Completed</b>
+                      </div>
                     </div>
                   }
 
                 </Modal.Body>
-                <Modal.Footer>
-                  {/* <Button variant="primary" onClick={handleClose}>
-                  Close
-                </Button> */}
-                </Modal.Footer>
               </Modal>
 
 
@@ -392,7 +390,7 @@ const InputComponent = ({ setCombinations }) => {
                       <label for="exampleInputPassword1" class="form-label">Password</label>
                       <input type="password" class="form-control" id="exampleInputPassword1" onChange={handlepassword} />
                     </div>
-                    <button type="submit" class="btn btn-primary" onClick={login} >Submit</button>
+                    <button type="submit" class="btn btn-primary" style={{backgroundColor : "#A31619"}} onClick={login} >Log In</button>
                   </div>
                 </Modal.Body>
                 <Modal.Footer>

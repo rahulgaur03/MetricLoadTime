@@ -124,7 +124,7 @@
    color: white !important;
 }
 
-.tabcontainer{
+.modeltabcontainer{
   width : 95% !important;
 }
 
@@ -134,4 +134,31 @@
 
 .buttoncontainer{
   width : 93% !important;
+}
+
+
+.loadtimeprogress{
+  width: 20px !important;
+  height: 20px !important;
+  color : #A31619 !important;
+}
+
+.tabcontainer{
+  width : 98% !important;
+  padding-left: 0px !important;
+}
+
+
+.exportbtn{
+  border: none;
+    border-radius: 3px;
+    padding: 2px;
+    width : 100px;
+    height : 31px
+    /* margin-right :  */
+}
+
+.exportbtn:hover{
+  background-color: #A31619 !important;
+   color: white !important;
 }
