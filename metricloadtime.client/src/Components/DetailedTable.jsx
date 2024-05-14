@@ -165,55 +165,18 @@ import {
 } from 'material-react-table';
 import axios from "axios";
 
+// import {
+//   Box,
+// } from '@mui/material';
+import CircularProgress from '@mui/material/CircularProgress';
 
-const Example = ({combinations}) => {
 
-  const [initialcombinations, setinitialcombinations] = useState(combinations.results);
-  const [rowSelection, setRowSelection] = useState({});
+const Example = ({combinations,initialcombinations,setinitialcombinations,genereatedLoadTimes,setGenereatedLoadTimes,rowSelection,setRowSelection}) => {
+
+
 
   console.log(initialcombinations)
 
-  const updateArray = (arrayB) => {
-    setinitialcombinations(prevArrayA => {
-        return prevArrayA.map((aItem, index) => {
-            const bItem = arrayB.find(item => item.uniqueID === aItem.uniqueID);
-            if (bItem && aItem.loadTime !== bItem.loadTime) {
-                return { ...aItem, loadTime: bItem.loadTime, previousLoadTime: bItem.previousLoadTime };
-            } else {
-                return aItem;
-            }
-        });
-    });
-};
-
-const handleReload = () =>
-{
-  const fetchData = async () => {
-    const fetchedQueries = [];
-    for (const id in rowSelection) {
-      const matchingCombination = initialcombinations.find((c) => c.uniqueID.toString() === id);
-      if (matchingCombination) {
-        try {
-          const response = await axios.post('http://localhost:8001/api/adomd/reload', {
-             uniqueID: id, Query: matchingCombination.query 
-          });
-          // fetchedQueries.push({ uniqueID: row.uniqueID, query: response.data });
-          console.log(response.data)
-          updateArray(response.data)
-          setTimeout(() => {
-            setRowSelection({})
-          }, 2000);
-        } catch (error) {
-          console.error(`Failed to fetch query for ID ${id}: ${error.message}`);
-        }
-      } else {
-        console.warn(`No matching combination found for ID ${id}`);
-      }
-    }
-  };
-
-  fetchData();
-}
 
 
 
@@ -270,6 +233,19 @@ const columns = useMemo(
       {
         accessorKey: 'loadTime',
         header: 'Load Time',
+        Cell: ({ cell }) => (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            {/* using renderedCellValue instead of cell.getValue() preserves filter match highlighting */}
+            {cell.getValue() == 'x' ? <CircularProgress className="loadtimeprogress" /> : <span>{cell.getValue()}</span>  }
+          
+          </Box>
+        ),
       },
       {
         accessorKey: 'previousLoadTime',
@@ -317,8 +293,12 @@ const columns = useMemo(
   // }, [rowSelection]);
 
   return(
-  <div>
-    <button type="button" class="btn btn-danger" onClick={handleReload} >Reload</button>
+    <div>
+    {/* <div className = 'd-flex justify-content-between'>
+   
+      {/* <button type="button" class="btn btn-danger" onClick={handleReload} style={{height : "fit-content"}} >Reload</button> */}
+      
+    {/* </div> */} 
 
     <MaterialReactTable table={table} />;
   </div>

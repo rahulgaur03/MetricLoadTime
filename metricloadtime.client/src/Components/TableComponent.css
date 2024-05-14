@@ -1,0 +1,11 @@
+
+.detail{
+    background-color: #A31619;
+    color: white;
+    font-weight: 600;
+    height: 31px;
+    text-align: center;
+    padding: revert;
+    width: 77px;
+    border-radius: 4px;
+  }
