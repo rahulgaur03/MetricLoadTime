@@ -123,7 +123,8 @@ namespace MetricLoadTime.Server.Controllers
                 _allCombinations = ConvertToDataTable(
                     from row1 in _allCombinations.AsEnumerable()
                     join row2 in _previousRunResults.AsEnumerable()
-                    on row1.Field<string>("Query") equals row2.Field<string>("Query")
+                    on row1.Field<string>("Query") equals row2.Field<string>("Query") into joinedRows
+                    from row2 in joinedRows.DefaultIfEmpty()
                     select new
                     {
                         UniqueID = row1.Field<int>("UniqueID"),
@@ -131,7 +132,7 @@ namespace MetricLoadTime.Server.Controllers
                         DimensionName = row1.Field<string>("DimensionName"),
                         ColumnName = row1.Field<string>("ColumnName"),
                         LoadTime = row1.Field<string>("LoadTime"),
-                        PreviousLoadTime = row2.Field<string>("LoadTime"),
+                        PreviousLoadTime = row2?.Field<string>("LoadTime") ?? "0",
                         isMeasureUsedInVisual = row1.Field<string>("isMeasureUsedInVisual"),
                         ReportName = row1.Field<string>("ReportName"),
                         PageName = row1.Field<string>("PageName"),
@@ -216,43 +217,25 @@ namespace MetricLoadTime.Server.Controllers
         [HttpPost("reload")]
         public IActionResult Reload([FromBody] ReloadRequest request)
         {
-            _allCombinations.Rows[request.UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[request.UniqueID - 1]["LoadTime"];
-            AdomdConnection _con = new(_connectionString);
-            GetQueryExecutionTime(request.Query, request.UniqueID - 1, _allCombinations, _con);
-
-            var jsonResult = _allCombinations.AsEnumerable()
-                .Where(row => Convert.ToInt32(row["UniqueID"]) == request.UniqueID)
-                .Select(row => new
-                {
-                    UniqueID = row["UniqueID"],
-                    Measure = row["Measure"],
-                    DimensionName = row["DimensionName"],
-                    ColumnName = row["ColumnName"],
-                    LoadTime = row["LoadTime"],
-                    PreviousLoadTime = row["PreviousLoadTime"],
-                    isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
-                    ReportName = row["ReportName"],
-                    PageName = row["PageName"],
-                    VisualName = row["VisualName"],
-                    VisualTitle = row["VisualTitle"],
-                    Query = row["Query"],
-                    hasDimension = row["hasDimension"]
-                });
-
-            CreateExcelSheet(_allCombinations, $"{_downloadFolderPath}\\MetricLoadTime\\{_modelName}\\{_reportName}.xlsx");
-
-            return Ok(jsonResult);
+            foreach (int UniqueID in request.ReloadQuries.Keys.ToArray())
+            {
+                _allCombinations.Rows[UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[UniqueID - 1]["LoadTime"];
+            }
+            ExecuteAllQuery(_allCombinations,request.ReloadQuries);
+            return Ok(1);
         }
 
-        void ExecuteAllQuery(DataTable allQueries)
+        void ExecuteAllQuery(DataTable allQueries, Dictionary<int, string> reload = null)
         {
             var semaphore = new SemaphoreSlim(15);
             List<Task> tasks = [];
+            int quriesCount = (reload == null) ? allQueries.Rows.Count : reload.Keys.ToArray().Length;
 
-            for (int i = 0; i < allQueries.Rows.Count; i++)
+            for (int i = 0; i < quriesCount; i++)
             {
-                string query = allQueries.Rows[i]["Query"].ToString();
-                int rowIndex = i;
+                int rowIndex = (reload == null) ? i : reload.Keys.ToArray()[i]-1;
+                string query = (reload == null) ? allQueries.Rows[i]["Query"].ToString() : reload[rowIndex + 1].ToString();
+
                 tasks.Add(Task.Run(async () =>
                 {
                     await semaphore.WaitAsync();
@@ -888,8 +871,7 @@ namespace MetricLoadTime.Server.Controllers
 
     public class ReloadRequest
     {
-        public int UniqueID { get; set; }
-        public required string Query { get; set; }
+        public required Dictionary<int, string> ReloadQuries { get; set; }
     }
 
     public class ProgressRequest
