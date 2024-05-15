@@ -191,3 +191,21 @@
   align-items: center;
 }
 
+.cardline{
+  width: 52px;
+  height: 52px;
+  transform: rotate(90deg);
+  color: #A31619;
+}
+
+.card-title{
+  margin-top: 11px;
+  margin-left: 11px;
+  margin-right: 5px;
+}
+
+.card-text{
+  margin-top: 14px;
+    margin-left: -12px;
+    margin-right: 5px;
+}

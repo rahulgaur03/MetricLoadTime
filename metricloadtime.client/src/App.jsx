@@ -1,21 +1,23 @@
-import React, { useState } from 'react'
-import './App.css';
-import backgroundSVG from './assets/Background/Homepage.svg';
-import InputComponent from './Components/InputComponent';
-import TableComponent from './Components/TableComponent';
+import React, { useState } from "react";
+import "./App.css";
+import backgroundSVG from "./assets/Background/Homepage.svg";
+import InputComponent from "./Components/InputComponent";
+import TableComponent from "./Components/TableComponent";
+import { IoRemoveOutline } from "react-icons/io5";
+
 
 const App = () => {
-  const [combinations, setCombinations] = useState({})
-  localStorage.setItem('combinations', JSON.stringify(combinations))
+  const [combinations, setCombinations] = useState({});
+  localStorage.setItem("combinations", JSON.stringify(combinations));
   const [inputs, setInputs] = useState({
-    filePath: '',
-    modelName: '',
-    xmlaEndpoint: '',
-    thresholdValue: '',
+    filePath: "",
+    modelName: "",
+    xmlaEndpoint: "",
+    thresholdValue: "",
     runningForFirstTime: 0,
-  });  
-  
-  console.log(combinations)
+  });
+
+  // console.log(combinations)
 
   return (
     <>
@@ -30,11 +32,10 @@ const App = () => {
       ) : (
         <InputComponent setCombinations={setCombinations} inputs={inputs} setInputs={setInputs} />
       )}
-      {/* <div style={{ backgroundImage: `url(${backgroundSVG})`, backgroundSize : 'content', height: '100vh'}}> */}
-      {/* ASDF */}
-      {/* </div> */}
+      
+     
     </>
-  )
-}
+  );
+};
 
-export default App
+export default App;

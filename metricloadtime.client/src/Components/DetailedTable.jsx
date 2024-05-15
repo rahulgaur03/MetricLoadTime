@@ -175,7 +175,7 @@ const Example = ({combinations,initialcombinations,setinitialcombinations,genere
 
 
 
-  console.log(initialcombinations)
+  // console.log(initialcombinations)
 
 
 
@@ -188,25 +188,25 @@ const Example = ({combinations,initialcombinations,setinitialcombinations,genere
         clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
       }
       else{
-        let generateCombinationsPromise
+          let generateCombinationsPromise
 
 
-        generateCombinationsPromise = fetch('api/adomd/getloadtime', {
-          method: 'GET',
-        });
+          generateCombinationsPromise = fetch('api/adomd/getloadtime', {
+            method: 'GET',
+          });
 
-        
+          
 
-        if (generateCombinationsPromise) {
-          const generateCombinationsResponse = await generateCombinationsPromise;
-          if (generateCombinationsResponse.ok) {
-            // console.log(generateCombinationsResponse.json())
-            generateCombinationsResponse.clone().json().then(results => setinitialcombinations(results));
-            clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
-          } else {
-            clearInterval(intervalId); // Stop polling if generateCombinationsPromise fails
+          if (generateCombinationsPromise) {
+            const generateCombinationsResponse = await generateCombinationsPromise;
+            if (generateCombinationsResponse.ok) {
+              // console.log(generateCombinationsResponse.json())
+              generateCombinationsResponse.clone().json().then(results => setinitialcombinations(results));
+              clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
+            } else {
+              clearInterval(intervalId); // Stop polling if generateCombinationsPromise fails
+            }
           }
-        }
       }
     } catch (error) {
       console.error(error);
