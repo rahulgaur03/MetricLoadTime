@@ -16,6 +16,9 @@
     "directories": {
       "output": "../../../bin/Desktop"
     },
+    "win": {
+      "icon": "../../../metricloadtime.client/src/assets/metricloadtime.ico"
+    },
     "extraResources": [
       {
         "from": "./bin",

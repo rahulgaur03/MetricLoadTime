@@ -19,7 +19,7 @@ var browserWindowOptions = new BrowserWindowOptions
 {
     AutoHideMenuBar = true ,
     Width = 1400,
-    Height = 1000,
+    Height = 1000
 };
 
 await Electron.WindowManager.CreateWindowAsync(browserWindowOptions);
