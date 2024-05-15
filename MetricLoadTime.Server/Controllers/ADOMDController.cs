@@ -211,7 +211,8 @@ namespace MetricLoadTime.Server.Controllers
                 hasDimension = row["hasDimension"]
             });
 
-            return Ok(jsonResult);
+            Dictionary<string, Object> response = new() { { "results", jsonResult } };
+            return Ok(response);
         }
 
         [HttpPost("reload")]
