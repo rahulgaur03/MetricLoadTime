@@ -122,9 +122,8 @@ namespace MetricLoadTime.Server.Controllers
             {
                 _allCombinations = ConvertToDataTable(
                     from row1 in _allCombinations.AsEnumerable()
-                    join row2 in _previousRunResults.AsEnumerable()
-                    on row1.Field<string>("Query") equals row2.Field<string>("Query") into joinedRows
-                    from row2 in joinedRows.DefaultIfEmpty()
+                    let matchingRows = _previousRunResults.AsEnumerable().Where(row => row.Field<string>("Query") == row1.Field<string>("Query")).Take(1)
+                    from row2 in matchingRows.DefaultIfEmpty()
                     select new
                     {
                         UniqueID = row1.Field<int>("UniqueID"),
@@ -222,7 +221,7 @@ namespace MetricLoadTime.Server.Controllers
             {
                 _allCombinations.Rows[UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[UniqueID - 1]["LoadTime"];
             }
-            ExecuteAllQuery(_allCombinations,request.ReloadQuries);
+            ExecuteAllQuery(_allCombinations, request.ReloadQuries);
             return Ok(1);
         }
 
@@ -234,7 +233,7 @@ namespace MetricLoadTime.Server.Controllers
 
             for (int i = 0; i < quriesCount; i++)
             {
-                int rowIndex = (reload == null) ? i : reload.Keys.ToArray()[i]-1;
+                int rowIndex = (reload == null) ? i : reload.Keys.ToArray()[i] - 1;
                 string query = (reload == null) ? allQueries.Rows[i]["Query"].ToString() : reload[rowIndex + 1].ToString();
 
                 tasks.Add(Task.Run(async () =>
