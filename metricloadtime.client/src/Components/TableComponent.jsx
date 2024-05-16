@@ -10,7 +10,7 @@ import { IoRemoveOutline } from "react-icons/io5";
 
 import axios from "axios";
 
-const TableComponent = ({ combinations, modelName,thresholdValue }) => {
+const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
   const [view, setView] = useState("detail");
   const [genereatedloadTimes, setGenereatedloadTimes] = useState(0);
   const [initialcombinations, setinitialcombinations] = useState(
@@ -450,224 +450,231 @@ const TableComponent = ({ combinations, modelName,thresholdValue }) => {
         //     </div>
         //   </div>
         <div>
-            <div className="cards justify-content-evenly">
+        <div className="usercardcontainer">
+          <div className="cards justify-content-evenly">
+            <div className="carD ">
+              <div
+                className="card total_measures  rounded usercard"
+                style={{ width: "1000px" }}
+              >
+                <div className=" d-flex justify-content-between">
+                  <div className="d-flex">
+                    <IoRemoveOutline className="cardline" />
+                    <h6 className="card-text">
+                      <b>Model Name : </b>
+                    </h6>
+                  </div>
+                  {/* </div> */}
+                  {/* </div> */}
+                  {/* </div> */}
+                  {/* <div className="carD px-5"> */}
+                  {/* <div className="card total_measures  rounded-0 "> */}
+                  {/* <div className=" d-flex"> */}
+                  {/* <IoRemoveOutline className="cardline" /> */}
 
-              <div className="carD px-5 ">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-                    <h6 className="card-text">
-                    <b>Model Name</b>
-                    </h6>
-                  </div>
-                </div>
-              </div>
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                    <b>Shopper Marketing Dataset</b>
-                    </h6>
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="cards justify-content-evenly">
-
-              <div className="carD px-5 ">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-                    <h6 className="card-text">
-                    <b>Report Name</b>
-                    </h6>
-                  </div>
-                </div>
-              </div>
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                    <b>Shopper Marketing UAT Build</b>
-                    </h6>
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="cards justify-content-evenly">
-
-              <div className="carD px-5 ">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-                    <h6 className="card-text">
-                    <b>XMLA Endpoint</b>
-                    </h6>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                    <b>Shopper Marketing Dataset</b>
-                    </h6>
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="cards justify-content-evenly">
-
-              <div className="carD px-5 ">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-                    <h6 className="card-text">
-                    <b>Threshold Value</b>
-                    </h6>
-                  </div>
-                </div>
-              </div>
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                    <b>3</b>
-                    </h6>
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="cards">
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                      <b>Total Measure Combination</b>
-                    </h6>
-                    <h5 className="card-title mb-auto">
-                      {/* {initialcombinations.length} */}100
-                    </h5>
-                  </div>
-                </div>
-              </div>
-    
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                    <b>Combinations below threshold</b>
-    
-                    </h6>
-                    <h5 className="card-title mb-auto">
-                      {/* {
-                            initialcombinations
-                              .map((entry) => entry.loadTime)
-                              .filter((e) => e < thresholdValue).length
-                          } */}100
-    
-                    </h5>
-                  </div>
-                </div>
-              </div>
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                    <b>Combinations above threshold</b>
-                    </h6>
-                    <h5 className="card-title mb-auto">
-                       {/* {
-                            initialcombinations
-                              .map((entry) => entry.loadTime)
-                              .filter((e) => e === thresholdValue).length
-                          } */}100
-    
-                    </h5>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="cards">
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                      <b>Combinations From Report</b>
-                    </h6>
-                    <h5 className="card-title mb-auto">
-                    {/* {
-                            initialcombinations
-                              .map((entry) => entry.reportName)
-                              .filter((e) => e != "-").length
-                          } */} 100
-                    </h5>
-                  </div>
-                </div>
-              </div>
-    
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                    <b>Combinations From Model</b>
-    
-                    </h6>
-                    <h5 className="card-title mb-auto">
-                    {/* {
-                            initialcombinations
-                              .map((entry) => entry.reportName)
-                              .filter((e) => e === "-").length
-                          } */} 100
-    
-                    </h5>
-                  </div>
-                </div>
-              </div>
-              <div className="carD px-5">
-                <div className="card total_measures  rounded-0 ">
-                  <div className=" d-flex">
-                    <IoRemoveOutline className="cardline" />
-    
-                    <h6 className="card-text">
-                    <b>Combinations With Dimension</b>
-                    </h6>
-                    <h5 className="card-title mb-auto">
-                    {/* {
-                            initialcombinations
-                              .map((entry) => entry.reportName)
-                              .filter((e) => e === "-").length
-                          } */}100
-    
-                    </h5>
-                  </div>
+                  <h6 className="card-text">
+                    <b>{inputs.modelName}</b>
+                  </h6>
                 </div>
               </div>
             </div>
           </div>
+          <div className="cards justify-content-evenly">
+            <div className="carD ">
+              <div
+                className="card total_measures  rounded-0 usercard"
+                style={{ width: "800px" }}
+              >
+                <div className=" d-flex justify-content-between">
+                  <div className="d-flex">
+                    <IoRemoveOutline className="cardline" />
+                    <h6 className="card-text">
+                      <b>Report Name : </b>
+                    </h6>
+                  </div>
+                  {/* </div> */}
+                  {/* </div> */}
+                  {/* </div> */}
+                  {/* <div className="carD px-5"> */}
+                  {/* <div className="card total_measures  rounded-0 "> */}
+                  {/* <div className=" d-flex"> */}
+                  {/* <IoRemoveOutline className="cardline" /> */}
+
+                  <h6 className="card-text">
+                    <b>{inputs.filePath}</b>
+                  </h6>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="cards justify-content-evenly">
+            <div className="carD">
+              <div
+                className="card total_measures  rounded-0 usercard "
+                style={{ width: "800px" }}
+              >
+                <div className=" d-flex justify-content-between">
+                  <div className="d-flex">
+                    <IoRemoveOutline className="cardline" />
+                    <h6 className="card-text">
+                      <b>XMLA Endpoint : </b>
+                    </h6>
+                  </div>
+                  {/* </div> */}
+                  {/* </div> */}
+                  {/* </div> */}
+                  {/* <div className="carD px-5"> */}
+                  {/* <div className="card total_measures  rounded-0 "> */}
+                  {/* <div className=" d-flex"> */}
+                  {/* <IoRemoveOutline className="cardline" /> */}
+
+                  <h6 className="card-text">
+                    <b>{inputs.xmlaEndpoint}</b>
+                  </h6>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="cards justify-content-evenly">
+            <div className="carD ">
+              <div
+                className="card total_measures  rounded-0 usercard"
+                style={{ width: "800px" }}
+              >
+                <div className=" d-flex justify-content-between">
+                  <div className="d-flex">
+                    <IoRemoveOutline className="cardline" />
+                    <h6 className="card-text">
+                      <b>Threshold Value : </b>
+                    </h6>
+                  </div>
+                  {/* </div> */}
+                  {/* </div> */}
+                  {/* </div> */}
+                  {/* <div className="carD px-5"> */}
+                  {/* <div className="card total_measures  rounded-0 "> */}
+                  {/* <div className=" d-flex"> */}
+                  {/* <IoRemoveOutline className="cardline" /> */}
+
+                  <h6 className="card-text">
+                    <b>{thresholdValue}</b>
+                  </h6>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="cards">
+          <div className="carD px-5">
+            <div className="card total_measures  rounded-0 ">
+              <div className=" d-flex">
+                <IoRemoveOutline className="cardline" />
+
+                <h6 className="card-text">
+                  <b>Total Measure Combination</b>
+                </h6>
+                <h5 className="card-title mb-auto">
+                  {initialcombinations.length}
+                </h5>
+              </div>
+            </div>
+          </div>
+
+          <div className="carD px-5">
+            <div className="card total_measures  rounded-0 ">
+              <div className=" d-flex">
+                <IoRemoveOutline className="cardline" />
+
+                <h6 className="card-text">
+                  <b>Combinations below threshold</b>
+                </h6>
+                <h5 className="card-title mb-auto">
+                  {
+                            initialcombinations
+                              .map((entry) => entry.loadTime)
+                              .filter((e) => e < thresholdValue).length
+                          }
+                </h5>
+              </div>
+            </div>
+          </div>
+          <div className="carD px-5">
+            <div className="card total_measures  rounded-0 ">
+              <div className=" d-flex">
+                <IoRemoveOutline className="cardline" />
+
+                <h6 className="card-text">
+                  <b>Combinations above threshold</b>
+                </h6>
+                <h5 className="card-title mb-auto">
+                  {
+                            initialcombinations
+                              .map((entry) => entry.loadTime)
+                              .filter((e) => e === thresholdValue).length
+                          }
+                </h5>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="cards">
+          <div className="carD px-5">
+            <div className="card total_measures  rounded-0 ">
+              <div className=" d-flex">
+                <IoRemoveOutline className="cardline" />
+
+                <h6 className="card-text">
+                  <b>Combinations From Report</b>
+                </h6>
+                <h5 className="card-title mb-auto">
+                  {
+                            initialcombinations
+                              .map((entry) => entry.reportName)
+                              .filter((e) => e != "-").length
+                          }
+                </h5>
+              </div>
+            </div>
+          </div>
+
+          <div className="carD px-5">
+            <div className="card total_measures  rounded-0 ">
+              <div className=" d-flex">
+                <IoRemoveOutline className="cardline" />
+
+                <h6 className="card-text">
+                  <b>Combinations From Model</b>
+                </h6>
+                <h5 className="card-title mb-auto">
+                  {
+                            initialcombinations
+                              .map((entry) => entry.reportName)
+                              .filter((e) => e === "-").length
+                          }
+                </h5>
+              </div>
+            </div>
+          </div>
+          <div className="carD px-5">
+            <div className="card total_measures  rounded-0 ">
+              <div className=" d-flex">
+                <IoRemoveOutline className="cardline" />
+
+                <h6 className="card-text">
+                  <b>Combinations With Dimension</b>
+                </h6>
+                <h5 className="card-title mb-auto">
+                  {
+                            initialcombinations
+                              .map((entry) => entry.reportName)
+                              .filter((e) => e === "-").length
+                          }
+                </h5>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
         )}
       </div>
     </>

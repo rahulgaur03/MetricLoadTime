@@ -5,7 +5,6 @@ import InputComponent from "./Components/InputComponent";
 import TableComponent from "./Components/TableComponent";
 import { IoRemoveOutline } from "react-icons/io5";
 
-
 const App = () => {
   const [combinations, setCombinations] = useState({});
   localStorage.setItem("combinations", JSON.stringify(combinations));
@@ -28,11 +27,10 @@ const App = () => {
       </nav>
 
       {combinations.results ? (
-        <TableComponent combinations={combinations} modelName = {inputs.modelName} thresholdValue = {inputs.thresholdValue} />
+        <TableComponent combinations={combinations} modelName = {inputs.modelName} thresholdValue = {inputs.thresholdValue} inputs={inputs}/>
       ) : (
         <InputComponent setCombinations={setCombinations} inputs={inputs} setInputs={setInputs} />
       )}
-      
      
     </>
   );
