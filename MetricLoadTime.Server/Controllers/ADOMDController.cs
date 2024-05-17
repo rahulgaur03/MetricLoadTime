@@ -26,6 +26,21 @@ namespace MetricLoadTime.Server.Controllers
         private static DataTable _allCombinations;
         private static DataTable _allColumnCount;
         private static DataTable _previousRunResults;
+        private static readonly string logFilePath = $"{_downloadFolderPath}\\MetricLoadTime\\log.txt";
+        static ADOMDController()
+        {
+            var logDirectory = Path.GetDirectoryName(logFilePath);
+            if (!Directory.Exists(logDirectory))
+            {
+                Directory.CreateDirectory(logDirectory);
+            }
+            else{
+                System.IO.File.Delete(logFilePath);
+                Directory.CreateDirectory(logDirectory);
+            }
+            var logFileWriter = new StreamWriter(logFilePath, append: true) { AutoFlush = true };
+            Console.SetOut(logFileWriter);
+        }
 
         [HttpPost("analyze")]
         public IActionResult Analyze([FromBody] AnalyzeRequest request)
@@ -110,14 +125,14 @@ namespace MetricLoadTime.Server.Controllers
                 finally { semaphoreReferenceTables.Release(); }
             }));
 
-
+            Console.WriteLine("Starting execution of the reference tables query.");
             Task.WhenAll(tasksReferenceTables).Wait();
-
+            Console.WriteLine("All reference tables have been created.");
             foreach (DataRow row in ReferenceTables["columnsQuery"].Rows) row["ColumnName"] = string.IsNullOrWhiteSpace(row["ColumnName"]?.ToString()) ? row["InferredColumnName"]?.ToString() : row["ColumnName"]?.ToString();
             ReferenceTables["columnsQuery"].Columns.Remove("InferredColumnName");
             var finalColumns = GetFinalColumns(ReferenceTables["tableQuery"], ReferenceTables["columnsQuery"]);
+            Console.WriteLine("Completed final column list.");
             _allCombinations = GetAllCombination(ReferenceTables["measureListSQLQuery"], ReferenceTables["measureReferenceQuery"], ReferenceTables["relationshipQuery"], ReferenceTables["tableQuery"], finalColumns, ReferenceTables["columnsQuery"]);
-
             if (_isPreviousRunResultsExist == 1)
             {
                 _allCombinations = ConvertToDataTable(
@@ -142,8 +157,10 @@ namespace MetricLoadTime.Server.Controllers
                     }
                 );
             }
+            Console.WriteLine("Generated all possible combinations.");
 
             Task.Run(() => ExecuteAllQuery(_allCombinations));
+            Console.WriteLine("Starting execution of the all combinations query.");
 
             var jsonResult = _allCombinations.AsEnumerable().Select(row => new
             {
@@ -244,6 +261,7 @@ namespace MetricLoadTime.Server.Controllers
                         using var connection = new AdomdConnection(_connectionString);
                         GetQueryExecutionTime(query, rowIndex, allQueries, connection);
                     }
+                    catch { }
                     finally
                     {
                         semaphore.Release();
@@ -256,44 +274,54 @@ namespace MetricLoadTime.Server.Controllers
 
         void GetQueryExecutionTime(string query, int rowIndex, DataTable allQueries, dynamic connection)
         {
-            connection.Open();
+            try
+            {
+                connection.Open();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Connection Opening: {ex.Message}");
+            }
             var command = new AdomdCommand(query, connection);
             int CommandTimeout = (int)(_thresholdValue + 1);
             int thresholdTimeMS = (int)(_thresholdValue * 1000);
             command.CommandTimeout = CommandTimeout;
             double queryExecutionTime = 0;
+            var cancellationTokenSource = new CancellationTokenSource();
             try
             {
                 DateTime startTime = DateTime.Now;
-                var cancellationTokenSource = new CancellationTokenSource();
+
                 var executionTask = Task.Run(() =>
                 {
                     using (cancellationTokenSource.Token.Register(() => command.Cancel()))
                     {
                         return command.ExecuteReader();
                     }
-                });
-                if (!executionTask.Wait(thresholdTimeMS))
-                {
-                    cancellationTokenSource.Cancel();
-                    Console.WriteLine($"Query took too long to execute. Aborting query...");
-                    queryExecutionTime = _thresholdValue;
-                }
-                else
+                }, cancellationTokenSource.Token);
+                if (Task.WhenAny(executionTask, Task.Delay(thresholdTimeMS)).Result == executionTask)
                 {
                     DateTime endTime = DateTime.Now;
                     queryExecutionTime = (endTime - startTime).TotalSeconds;
+                    allQueries.Rows[rowIndex]["LoadTime"] = queryExecutionTime;
+                    Console.WriteLine($"Query: {query}\nExecution time:{queryExecutionTime}");
+                    connection.Close();
+                    connection.Dispose();
+                }
+                else
+                {
+                    allQueries.Rows[rowIndex]["LoadTime"] = _thresholdValue;
+                    Console.WriteLine($"Query took too long to execute. Aborting query...\nQuery: {query}\nExecution time:{_thresholdValue}");
+                    cancellationTokenSource.Cancel();
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error executing query: {ex.Message}");
-                queryExecutionTime = -1;
+                allQueries.Rows[rowIndex]["LoadTime"] = -1;
+                Console.WriteLine($"Error executing query: {ex.Message}\nQuery: {query}\nExecution time:{-1}");
+                connection.Close();
+                connection.Dispose();
             }
-            connection.Close();
-            connection.Dispose();
-            Console.WriteLine($"Query: {query}\nExecution time:{queryExecutionTime}");
-            allQueries.Rows[rowIndex]["LoadTime"] = queryExecutionTime;
         }
 
         DataTable GetFinalColumns(DataTable tableQuery, DataTable columnsQuery)
@@ -521,7 +549,7 @@ namespace MetricLoadTime.Server.Controllers
                 _previousRunResults = dt;
                 _isPreviousRunResultsExist = 1;
             }
-
+            Console.WriteLine($"The report {_reportName} has been parsed.");
             return dataTable;
         }
 
@@ -810,7 +838,14 @@ namespace MetricLoadTime.Server.Controllers
 
         DataTable ExecuteDataTable(string query, List<string> columnsList, dynamic connection)
         {
-            connection.Open();
+            try
+            {
+                connection.Open();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Connection Opening: {ex.Message}");
+            }
             var command = new AdomdCommand(query, connection);
             var reader = command.ExecuteReader();
 
