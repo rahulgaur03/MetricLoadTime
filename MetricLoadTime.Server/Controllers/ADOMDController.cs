@@ -22,7 +22,7 @@ namespace MetricLoadTime.Server.Controllers
         private static string _modelName = "";
         private static float _thresholdValue = 2;
         private static int _isPreviousRunResultsExist = 0;
-        private static DataTable _reportData;
+        private static DataTable _reportData = null;
         private static DataTable _allCombinations;
         private static DataTable _allColumnCount;
         private static DataTable _previousRunResults;
@@ -34,7 +34,8 @@ namespace MetricLoadTime.Server.Controllers
             {
                 Directory.CreateDirectory(logDirectory);
             }
-            else{
+            else
+            {
                 System.IO.File.Delete(logFilePath);
                 Directory.CreateDirectory(logDirectory);
             }
@@ -48,7 +49,21 @@ namespace MetricLoadTime.Server.Controllers
             _endPoint = request.EndPoint;
             _modelName = request.ModelName;
             _thresholdValue = request.ThresholdValue;
-            _reportData = GetReportData(request.FilePath);
+            foreach (var report in request.FilePath)
+            {
+                if (_reportData == null)
+                {
+                    _reportData = GetReportData(report);
+                }
+                else
+                {
+                    foreach (DataRow row in GetReportData(report).Rows)
+                    {
+                        _reportData.ImportRow(row);
+                    }
+                }
+
+            }
             return Ok(1);
         }
 
@@ -921,6 +936,6 @@ namespace MetricLoadTime.Server.Controllers
         public required string ModelName { get; set; }
         public float ThresholdValue { get; set; }
         public int RunningFirstTime { get; set; }
-        public required string FilePath { get; set; }
+        public required List<string> FilePath { get; set; }
     }
 }
