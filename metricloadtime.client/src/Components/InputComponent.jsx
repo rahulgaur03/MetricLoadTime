@@ -2,25 +2,33 @@ import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 // import Button from 'react-bootstrap/Button'; 
 import axios from 'axios';
+import Select from 'react-select';
 
 import Modal from 'react-bootstrap/Modal';
 
-const InputComponent = ({ setCombinations, inputs,setInputs }) => {
-
-
+const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath, setCombinations, inputs,setInputs }) => {
 
 
   const [model, setModel] = useState('powerbi');
-
   const [progress, setProgress] = useState({ Total: 0, Progress: 0 });
   const [popoverVisible, setPopoverVisible] = useState(false);
   const [progresspopoverVisible, setprogressPopoverVisible] = useState(false);
-
-  // const [combinations, setcombinations] = useState({})
-
+  const [displayedfile, setDisplayedfile] = useState([]);
 
 
+  const handleFileInputChange = (e) => {
+    setFilePath(e.target.value);
+  };
 
+  const handleFileAddButtonClick = () => {
+    if (filePath.trim() !== '') {
+        setDisplayedfile([...displayedfile, filePath]);
+        setFilePath(''); 
+        let filearray = filePathArray
+        filearray.push(filePath)
+        setFilePathArray(filearray)
+    }
+  };
 
 
   const [email, setEmail] = useState("")
@@ -37,6 +45,7 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
   const handleInputChange = (event) => {
     const { name, value, type, checked } = event.target;
     const inputValue = type === 'checkbox' ? 1 : value;
+
     setInputs({
       ...inputs,
       [name]: inputValue,
@@ -55,7 +64,7 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
   const handleResetClick = () => {
     setInputs({
       ...inputs,
-      filePath: '',
+      // filePath: '',
       modelName: '',
       xmlaEndpoint: '',
       thresholdValue: '',
@@ -63,19 +72,36 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
     });
   };
 
+  const handleRemoveFile = (event) => {
+    let file = event.target.innerText.slice(0,-2).concat(".pbix")
+    // console.log(file)
+    // console.log(filePathArray)
+    // filePathArray.forEach(element => {
+    //   if(element.endsWith("Refresh Tracker.pbix")){
+    //     console.log("asdfa")
+    //   }
+    // });
+    let filteredPathArray = filePathArray.filter(path => !path.endsWith(file));
+    let fileteredFileArray = displayedfile.filter(function(e) { return e !== event.target.innerText.slice(0,-2) })
+    setFilePathArray(filteredPathArray)
+    console.log(displayedfile)
+    // setDisplayedfile(fileteredFileArray)
+    setDisplayedfile(filteredPathArray)
+
+    // console.log(filteredPathArray)
+  }
+
   const analyze = async () => {
     let analyzePromise; // Define generateCombinationsPromise outside the try block
     try {
       const requestBody = {
-        FilePath: inputs.filePath,
+        FilePath: filePathArray,
         ModelName: inputs.modelName,
         EndPoint: inputs.xmlaEndpoint,
         ThresholdValue: parseInt(inputs.thresholdValue),
         RunningFirstTime: parseInt(inputs.runningForFirstTime),
       };
 
-      // Call /generatecombinations API without waiting for its response
-      // generateCombinationsPromise = fetch('http://127.0.0.1:3002/generatecombinations', {
       analyzePromise = fetch('api/adomd/analyze', {
         method: 'POST',
         headers: {
@@ -90,11 +116,9 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
         analyzeResponse.clone().json().then(result => console.log(JSON.parse(result)));
       }
 
-      // Show popover
       setPopoverVisible(true);
     } catch (error) {
       console.error(error);
-      // Handle error
     }
 
   }
@@ -102,7 +126,7 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
 
 
   const login = async () => {
-    let generateCombinationsPromise; // Define generateCombinationsPromise outside the try block
+    let generateCombinationsPromise; 
     try {
       const requestBody = {
         Username: String(email),
@@ -112,8 +136,6 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
 
       console.log(requestBody)
 
-      // Call /generatecombinations API without waiting for its response
-      // generateCombinationsPromise = fetch('http://127.0.0.1:3002/generatecombinations', {
       generateCombinationsPromise = fetch('api/adomd/progress', {
         method: 'POST',
         headers: {
@@ -122,30 +144,13 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
         body: JSON.stringify(requestBody)
       });
 
-
-      //   generateCombinationsPromise = axios.post('api/adomd/progress', requestBody, {
-      //   headers: {
-      //     "Accept": "*/*",
-      //     "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-      //     "Content-Type": "application/json" 
-      //   }
-      // });
-
-
-
-
-      // Show popover
       setprogressPopoverVisible(true);
       setPopoverVisible(false)
     } catch (error) {
       console.error(error);
-      // Handle error
     }
 
 
-
-
-    // Call /getprogress API immediately after sending the request to /generatecombinations
     const intervalId = setInterval(async () => {
       try {
         const progressResponse = await fetch('api/adomd/progressBar');
@@ -171,21 +176,13 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
         }
       } catch (error) {
         console.error(error);
-        // Handle error
       }
-    }, 2000); // Adjust polling interval as needed
+    }, 2000); 
   };
   const hasInputValues = Object.values(inputs).some(value => value !== '');
 
 
-  //   return (
 
-  // export default InputComponent;
-
-
-  // import React from 'react'
-
-  // const InputComponent = () => {
   return (
     <>
 
@@ -208,15 +205,29 @@ const InputComponent = ({ setCombinations, inputs,setInputs }) => {
         <div className="inputs container mx-5 mr-3" style={{ width: '85%' }}>
           <div className="filepathinput d-flex flex-column">
             <label className="filepath fs-5 fw-bold mt-2">File Path</label>
-            <input
-              type="text"
-              name="filePath"
-              className="mt-2"
-              style={{ height: '40px' }}
-              value={inputs.filePath}
-              onChange={handleInputChange}
-              placeholder="Enter File Path"
-            />
+            <div className = 'd-flex'>
+              <input
+                type="text"
+                name="filePath"
+                className="mt-2"
+                style={{ height: '40px', width : "-webkit-fill-available" }}
+                value={filePath}
+                onChange={handleFileInputChange}
+                placeholder="Enter File Path"
+              />
+              <button onClick={handleFileAddButtonClick} style={{height: '40px', color : "white", backgroundColor : "#A31619", border:"none"}} className='mt-2'>
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-plus" viewBox="0 0 16 16">
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
+              </svg>
+              </button>
+            </div>
+          </div>
+          <div>
+          {displayedfile.map((value, index) => (
+                  <button key={index} type="button" class="close" aria-label="Close" onClick={handleRemoveFile}>
+                    <span aria-hidden="true"> {value.replace(/^.*[\\/]/, '').replace(/\..*$/, '')} &times;</span>
+                </button>
+                ))}
           </div>
 
           {model === 'tabular' && (

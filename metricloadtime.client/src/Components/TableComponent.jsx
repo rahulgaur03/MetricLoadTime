@@ -6,11 +6,13 @@ import { CgExport } from "react-icons/cg";
 import { TfiReload } from "react-icons/tfi";
 import { mkConfig, generateCsv, download } from "export-to-csv"; //or use your library of choice here
 import { IoRemoveOutline } from "react-icons/io5";
+import { Popover, Typography } from '@mui/material'
+
 
 
 import axios from "axios";
 
-const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
+const TableComponent = ({filePathArray, combinations, modelName,thresholdValue, inputs }) => {
   const [view, setView] = useState("detail");
   const [genereatedloadTimes, setGenereatedloadTimes] = useState(0);
   const [initialcombinations, setinitialcombinations] = useState(
@@ -18,36 +20,39 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
   );
   const [rowSelection, setRowSelection] = useState({});
 
+  const [filteredData, setFilteredData] = useState(initialcombinations)
 
-  console.log(initialcombinations)
+  const [filterdimensionCheckboxFlag, setFilterdimensionCheckboxFlag] =
+  useState(false)
+const [anchorEl, setAnchorEl] = useState(null)
 
-  // const columnHelper = createMRTColumnHelper();
+const [
+  filterthresholdCheckboxFlag,
+  setFilterthresholdCheckboxFlag
+] = useState(false)
 
-  // const columns = [
-  // columnHelper.accessor('id', {
-  //     header: 'ID',
-  //     size: 40,
-  // }),
-  // columnHelper.accessor('firstName', {
-  //     header: 'First Name',
-  //     size: 120,
-  // }),
-  // columnHelper.accessor('lastName', {
-  //     header: 'Last Name',
-  //     size: 120,
-  // }),
-  // columnHelper.accessor('company', {
-  //     header: 'Company',
-  //     size: 300,
-  // }),
-  // columnHelper.accessor('city', {
-  //     header: 'City',
-  // }),
-  // columnHelper.accessor('country', {
-  //     header: 'Country',
-  //     size: 220,
-  // }),
-  // ];
+
+const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
+  useState(false)
+
+  const handleClick = event => {
+    setAnchorEl(event.currentTarget)
+  }
+
+  const handleClose = () => {
+    setAnchorEl(null)
+  }
+
+  const open = Boolean(anchorEl)
+  const id = open ? 'simple-popover' : undefined
+
+
+
+
+
+  const baseFileNames = filePathArray.map(value => 
+    value.replace(/^.*[\\/]/, '').replace(/\..*$/, '')
+  ).join(', ');
 
   const csvConfig = mkConfig({
     fieldSeparator: ",",
@@ -56,7 +61,6 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
     filename: modelName.concat(" Result"),
   });
 
-//   console.log(modelName);
 
   const handleExportData = () => {
     const csv = generateCsv(csvConfig)(initialcombinations);
@@ -80,7 +84,6 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
     });
   };
 
-  console.log(rowSelection)
 
   const handleReload = () => {
     const fetchData = async () => {
@@ -92,22 +95,7 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
             updatedA[stringId] = item.query;
         }
         });
-        // Set the updated 'a'
         setRowSelection(updatedA);
-
-        console.log(updatedA)
-
-
-
-
-
-
-    //   const fetchedQueries = [];
-    //   for (const id in rowSelection) {
-        // const matchingCombination = initialcombinations.find(
-        //   (c) => c.uniqueID.toString() === id
-        // );
-        // if (matchingCombination) {
           try {
 
 
@@ -147,22 +135,6 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
                     } 
                 }
             }
-
-
-
-
-
-            // const response = await axios.post(
-            //   "http://localhost:8001/api/adomd/reload",
-            //   {
-            //     ReloadQuries: rowSelection,
-            //   }
-            // );
-            // // fetchedQueries.push({ uniqueID: row.uniqueID, query: response.data });
-            // console.log(response.data);
-            // updateArray(response.data);
-
-
             setTimeout(() => {
               setRowSelection({});
             }, 2000);
@@ -171,15 +143,42 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
               `Failed to fetch query for ID : ${error.message}`
             );
           }
-        // }
-        //  else {
-        //   console.warn(`No matching combination found for ID ${id}`);
-        // }
       }
-    // };
 
     fetchData();
   };
+
+
+  const handlethresholdCheckboxChange = event => {
+    setFilterthresholdCheckboxFlag(event.target.checked)
+
+    setFilteredData(
+      filteredData.filter(item => {
+        return !filterthresholdCheckboxFlag ? item.loadTime === (inputs.thresholdValue) : true
+      })
+    )
+  }
+
+  const handledimensionCheckboxChange = event => {
+    setFilterdimensionCheckboxFlag(event.target.checked)
+    setFilteredData(
+      filteredData.filter(item => {
+        return !filterdimensionCheckboxFlag ? item.hasDimension === '1' : true
+      })
+    )
+  }
+
+
+
+  const handlevisualCheckboxChange = event => {
+    setFiltervisualCheckboxFlag(event.target.checked)
+    setFilteredData(
+      filteredData.filter(item => {
+        return !filtervisualCheckboxFlag ? item.visualName !== '-' : true
+      })
+    )
+  }
+
 
   useEffect(() => {
     const countX = initialcombinations.filter(
@@ -187,6 +186,7 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
     ).length;
     setGenereatedloadTimes(countX);
   }, [initialcombinations]);
+
 
   console.log(combinations);
 
@@ -262,193 +262,65 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
                 </b>
               </button>
             </div>
+            {/* <Popover
+          id={id}
+          style={{ display: 'flex', flexDirection: 'row' }}
+          open={open}
+          anchorEl={anchorEl}
+          onClose={handleClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left'
+          }}
+        >
+          <Typography sx={{ p: 2 }} className='d-flex flex-column'> */}
+
+            <label>
+              <input
+                type="checkbox"
+                checked={filterthresholdCheckboxFlag}
+                onChange={handlethresholdCheckboxChange}
+                className='mx-2'
+              />
+              Above Threshold
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={filterdimensionCheckboxFlag}
+                onChange={handledimensionCheckboxChange}
+                className='mx-2'
+              />
+              Measure With Dimensions
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={filtervisualCheckboxFlag}
+                onChange={handlevisualCheckboxChange}
+                className='mx-2'
+              />
+              Measure With Visuals
+            </label>
+          {/* </Typography> */}
+        {/* </Popover> */}
           </div>
         </div>
         {view === "detail" ? (
+          <div>
+
           <Example
+            thresholdValue={inputs.thresholdValue}
             combinations={combinations}
-            initialcombinations={initialcombinations}
+            initialcombinations={filteredData}
             setinitialcombinations={setinitialcombinations}
             genereatedloadTimes={genereatedloadTimes}
             setGenereatedloadTimes={setGenereatedloadTimes}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
-          />
+            />
+          </div>
         ) : (
-        //     <div>
-        //                     <div className="cards">
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //               <b>Total Measure Combination</b>
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //               {initialcombinations.length}
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-    
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //             <b>Combinations below threshold</b>
-    
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //               {
-        //                     initialcombinations
-        //                       .map((entry) => entry.loadTime)
-        //                       .filter((e) => e < thresholdValue).length
-        //                   }
-    
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //             <b>Combinations above threshold</b>
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //                {
-        //                     initialcombinations
-        //                       .map((entry) => entry.loadTime)
-        //                       .filter((e) => e === thresholdValue).length
-        //                   }
-    
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-        //     </div>
-        //     <div className="cards">
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //               <b>Total Measure Combination</b>
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //               {initialcombinations.length}
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-    
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //             <b>Combinations below threshold</b>
-    
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //               {
-        //                     initialcombinations
-        //                       .map((entry) => entry.loadTime)
-        //                       .filter((e) => e < thresholdValue).length
-        //                   }
-    
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //             <b>Combinations above threshold</b>
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //                {
-        //                     initialcombinations
-        //                       .map((entry) => entry.loadTime)
-        //                       .filter((e) => e === thresholdValue).length
-        //                   }
-    
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-        //     </div>
-        //     <div className="cards">
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //               <b>Combinations From Report</b>
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //             {
-        //                     initialcombinations
-        //                       .map((entry) => entry.reportName)
-        //                       .filter((e) => e != "-").length
-        //                   }
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-    
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //             <b>Combinations From Model</b>
-    
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //             {
-        //                     initialcombinations
-        //                       .map((entry) => entry.reportName)
-        //                       .filter((e) => e === "-").length
-        //                   }
-    
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-        //       <div className="carD px-5">
-        //         <div className="card total_measures  rounded-0 ">
-        //           <div className=" d-flex">
-        //             <IoRemoveOutline className="cardline" />
-    
-        //             <h6 className="card-text">
-        //             <b>Combinations With Dimension</b>
-        //             </h6>
-        //             <h5 className="card-title mb-auto">
-        //             {
-        //                     initialcombinations
-        //                       .map((entry) => entry.reportName)
-        //                       .filter((e) => e === "-").length
-        //                   }
-    
-        //             </h5>
-        //           </div>
-        //         </div>
-        //       </div>
-        //     </div>
-        //   </div>
         <div>
         <div className="usercardcontainer">
           <div className="cards justify-content-evenly">
@@ -464,14 +336,6 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
                       <b>Model Name : </b>
                     </h6>
                   </div>
-                  {/* </div> */}
-                  {/* </div> */}
-                  {/* </div> */}
-                  {/* <div className="carD px-5"> */}
-                  {/* <div className="card total_measures  rounded-0 "> */}
-                  {/* <div className=" d-flex"> */}
-                  {/* <IoRemoveOutline className="cardline" /> */}
-
                   <h6 className="card-text">
                     <b>{inputs.modelName}</b>
                   </h6>
@@ -483,7 +347,7 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
             <div className="carD ">
               <div
                 className="card total_measures  rounded-0 usercard"
-                style={{ width: "800px" }}
+                style={{ width: "1000px" }}
               >
                 <div className=" d-flex justify-content-between">
                   <div className="d-flex">
@@ -492,16 +356,8 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
                       <b>Report Name : </b>
                     </h6>
                   </div>
-                  {/* </div> */}
-                  {/* </div> */}
-                  {/* </div> */}
-                  {/* <div className="carD px-5"> */}
-                  {/* <div className="card total_measures  rounded-0 "> */}
-                  {/* <div className=" d-flex"> */}
-                  {/* <IoRemoveOutline className="cardline" /> */}
-
-                  <h6 className="card-text">
-                    <b>{inputs.filePath}</b>
+                    <h6 className="card-text">
+                    <b>{baseFileNames}</b>
                   </h6>
                 </div>
               </div>
@@ -511,7 +367,7 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
             <div className="carD">
               <div
                 className="card total_measures  rounded-0 usercard "
-                style={{ width: "800px" }}
+                style={{ width: "1000px" }}
               >
                 <div className=" d-flex justify-content-between">
                   <div className="d-flex">
@@ -520,14 +376,6 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
                       <b>XMLA Endpoint : </b>
                     </h6>
                   </div>
-                  {/* </div> */}
-                  {/* </div> */}
-                  {/* </div> */}
-                  {/* <div className="carD px-5"> */}
-                  {/* <div className="card total_measures  rounded-0 "> */}
-                  {/* <div className=" d-flex"> */}
-                  {/* <IoRemoveOutline className="cardline" /> */}
-
                   <h6 className="card-text">
                     <b>{inputs.xmlaEndpoint}</b>
                   </h6>
@@ -539,7 +387,7 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
             <div className="carD ">
               <div
                 className="card total_measures  rounded-0 usercard"
-                style={{ width: "800px" }}
+                style={{ width: "1000px" }}
               >
                 <div className=" d-flex justify-content-between">
                   <div className="d-flex">
@@ -548,14 +396,6 @@ const TableComponent = ({ combinations, modelName,thresholdValue, inputs }) => {
                       <b>Threshold Value : </b>
                     </h6>
                   </div>
-                  {/* </div> */}
-                  {/* </div> */}
-                  {/* </div> */}
-                  {/* <div className="carD px-5"> */}
-                  {/* <div className="card total_measures  rounded-0 "> */}
-                  {/* <div className=" d-flex"> */}
-                  {/* <IoRemoveOutline className="cardline" /> */}
-
                   <h6 className="card-text">
                     <b>{thresholdValue}</b>
                   </h6>
