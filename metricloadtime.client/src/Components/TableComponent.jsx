@@ -7,6 +7,10 @@ import { TfiReload } from "react-icons/tfi";
 import { mkConfig, generateCsv, download } from "export-to-csv"; //or use your library of choice here
 import { IoRemoveOutline } from "react-icons/io5";
 import { Popover, Typography } from '@mui/material'
+import { IoFilterSharp } from "react-icons/io5";
+
+import Button from '@mui/material/Button';
+
 
 
 
@@ -35,18 +39,17 @@ const [
 const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
   useState(false)
 
-  const handleClick = event => {
-    setAnchorEl(event.currentTarget)
-  }
+
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
 
   const handleClose = () => {
-    setAnchorEl(null)
-  }
+    setAnchorEl(null);
+  };
 
-  const open = Boolean(anchorEl)
-  const id = open ? 'simple-popover' : undefined
-
-
+  const open = Boolean(anchorEl);
+  const id = open ? 'simple-popover' : undefined;
 
 
 
@@ -152,33 +155,53 @@ const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
   const handlethresholdCheckboxChange = event => {
     setFilterthresholdCheckboxFlag(event.target.checked)
 
-    setFilteredData(
-      filteredData.filter(item => {
-        return !filterthresholdCheckboxFlag ? item.loadTime === (inputs.thresholdValue) : true
-      })
-    )
+    // setFilteredData(
+    //   filteredData.filter(item => {
+    //     return !filterthresholdCheckboxFlag ? item.loadTime === (inputs.thresholdValue) : true
+    //   })
+    // )
   }
 
   const handledimensionCheckboxChange = event => {
     setFilterdimensionCheckboxFlag(event.target.checked)
-    setFilteredData(
-      filteredData.filter(item => {
-        return !filterdimensionCheckboxFlag ? item.hasDimension === '1' : true
-      })
-    )
+    // setFilteredData(
+    //   filteredData.filter(item => {
+    //     return !filterdimensionCheckboxFlag ? item.hasDimension === '1' : true
+    //   })
+    // )
   }
 
 
 
   const handlevisualCheckboxChange = event => {
     setFiltervisualCheckboxFlag(event.target.checked)
-    setFilteredData(
-      filteredData.filter(item => {
-        return !filtervisualCheckboxFlag ? item.visualName !== '-' : true
-      })
-    )
+    // setFilteredData(
+    //   filteredData.filter(item => {
+    //     return !filtervisualCheckboxFlag ? item.visualName !== '-' : true
+    //   })
+    // )
   }
 
+
+  useEffect(() => {
+    const filterConditions = [
+      filterthresholdCheckboxFlag ? item => item.loadTime === inputs.thresholdValue : null,
+      filterdimensionCheckboxFlag ? item => item.hasDimension === '1' : null,
+      filtervisualCheckboxFlag ? item => item.visualName !== '-' : null
+    ].filter(Boolean); // Removes null conditions
+  
+    const filteredData = filterConditions.length
+      ? initialcombinations.filter(item => filterConditions.every(condition => condition(item)))
+      : initialcombinations;
+  
+    setFilteredData(filteredData);
+  }, [
+    filterthresholdCheckboxFlag, 
+    filterdimensionCheckboxFlag, 
+    filtervisualCheckboxFlag, 
+  ]);
+  
+  
 
   useEffect(() => {
     const countX = initialcombinations.filter(
@@ -237,7 +260,50 @@ const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
           ) : (
             ""
           )}
+          
           <div className="d-flex">
+            <Button aria-describedby={id} variant="outlined" onClick={handleClick}className=" exportbtn" style = { {backgroundColor : "#f0f0f0", border : "none"}} >
+              <IoFilterSharp />
+            </Button>
+            <Popover
+              id={id}
+              open={open}
+              anchorEl={anchorEl}
+              onClose={handleClose}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'left',
+              }}
+            >
+              <Typography sx={{ p: 2 }} className="d-flex flex-column">              
+              <label>
+                <input
+                  type="checkbox"
+                  checked={filterthresholdCheckboxFlag}
+                  onChange={handlethresholdCheckboxChange}
+                  className='mx-2'
+                />
+                Combinations Above Threshold
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={filterdimensionCheckboxFlag}
+                  onChange={handledimensionCheckboxChange}
+                  className='mx-2'
+                />
+                Combinations With Dimensions
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={filtervisualCheckboxFlag}
+                  onChange={handlevisualCheckboxChange}
+                  className='mx-2'
+                />
+                Combinations With Visuals
+              </label></Typography>
+            </Popover>
             <div className="export mx-1">
               <button
                 type="button"
@@ -262,57 +328,37 @@ const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
                 </b>
               </button>
             </div>
-            {/* <Popover
-          id={id}
-          style={{ display: 'flex', flexDirection: 'row' }}
-          open={open}
-          anchorEl={anchorEl}
-          onClose={handleClose}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'left'
-          }}
-        >
-          <Typography sx={{ p: 2 }} className='d-flex flex-column'> */}
 
-            <label>
-              <input
-                type="checkbox"
-                checked={filterthresholdCheckboxFlag}
-                onChange={handlethresholdCheckboxChange}
-                className='mx-2'
-              />
-              Above Threshold
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={filterdimensionCheckboxFlag}
-                onChange={handledimensionCheckboxChange}
-                className='mx-2'
-              />
-              Measure With Dimensions
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={filtervisualCheckboxFlag}
-                onChange={handlevisualCheckboxChange}
-                className='mx-2'
-              />
-              Measure With Visuals
-            </label>
-          {/* </Typography> */}
-        {/* </Popover> */}
+            
+                  
           </div>
         </div>
         {view === "detail" ? (
           <div>
 
+          {/* <Popover
+            id={id}
+            style={{ display: 'flex', flexDirection: 'row' }}
+            open={open}
+            anchorEl={anchorEl}
+            onClose={handleClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'left'
+            }}
+          > */}
+            {/* <div className='d-flex flex-column'>
+
+
+            </div> */}
+          {/* </Popover> */}
+
           <Example
             thresholdValue={inputs.thresholdValue}
             combinations={combinations}
-            initialcombinations={filteredData}
+            initialcombinations={initialcombinations}
+            filteredData = {filteredData}
+            setFilteredData={setFilteredData}
             setinitialcombinations={setinitialcombinations}
             genereatedloadTimes={genereatedloadTimes}
             setGenereatedloadTimes={setGenereatedloadTimes}
