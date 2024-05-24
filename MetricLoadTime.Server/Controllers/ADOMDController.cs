@@ -43,37 +43,60 @@ namespace MetricLoadTime.Server.Controllers
             Console.SetOut(logFileWriter);
         }
 
+        [HttpGet("rerun")]
+        public IActionResult ReRun()
+        {
+            _reportData = null;
+            _isPreviousRunResultsExist = 0;
+            _allCombinations = null;
+            _allColumnCount = null;
+            _previousRunResults = null;
+            Console.WriteLine("--------------------------------------//Re-Running Tool//-----------------------------------------");
+            return Ok(1);
+        }
+
         [HttpPost("analyze")]
         public IActionResult Analyze([FromBody] AnalyzeRequest request)
         {
-            _endPoint = request.EndPoint;
-            _modelName = request.ModelName;
-            _thresholdValue = request.ThresholdValue;
-            foreach (var report in request.FilePath)
+            try
             {
-                if (_reportData == null)
+                _endPoint = request.EndPoint;
+                _modelName = request.ModelName;
+                _thresholdValue = request.ThresholdValue;
+                foreach (var report in request.FilePath)
                 {
-                    _reportData = GetReportData(report);
-                }
-                else
-                {
-                    foreach (DataRow row in GetReportData(report).Rows)
+                    if (_reportData == null)
                     {
-                        _reportData.ImportRow(row);
+                        _reportData = GetReportData(report);
                     }
-                }
+                    else
+                    {
+                        foreach (DataRow row in GetReportData(report).Rows)
+                        {
+                            _reportData.ImportRow(row);
+                        }
+                    }
 
+                }
+                return Ok(1);
             }
-            return Ok(1);
+            catch (Exception ex)
+            {
+                Dictionary<string, string> response = new() { { "Error", $"{ex.Message}" } };
+                return Ok(response);
+            }
+
         }
 
         [HttpPost("progress")]
         public IActionResult Progress([FromBody] ProgressRequest request)
         {
-            _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + request.Username + ";PWD=" + request.Password + "";
-            // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
+            try
+            {
+                _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=" + request.Username + ";PWD=" + request.Password + "";
+                // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
 
-            Dictionary<string, DataTable> ReferenceTables = new()
+                Dictionary<string, DataTable> ReferenceTables = new()
             {
             {"tableQuery", null},
             {"columnsQuery", null},
@@ -82,120 +105,126 @@ namespace MetricLoadTime.Server.Controllers
             {"relationshipQuery", null}
             };
 
-            var semaphoreReferenceTables = new SemaphoreSlim(5);
-            List<Task> tasksReferenceTables = [];
+                var semaphoreReferenceTables = new SemaphoreSlim(5);
+                List<Task> tasksReferenceTables = [];
 
-            tasksReferenceTables.Add(Task.Run(async () =>
-            {
-                await semaphoreReferenceTables.WaitAsync(); try
+                tasksReferenceTables.Add(Task.Run(async () =>
                 {
-                    using var connection = new AdomdConnection(_connectionString);
-                    ReferenceTables["tableQuery"] = ExecuteDataTable("SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
-                    ["TableName", "TableID"], connection);
-                }
-                finally { semaphoreReferenceTables.Release(); }
-            }));
-
-            tasksReferenceTables.Add(Task.Run(async () =>
-            {
-                await semaphoreReferenceTables.WaitAsync(); try
-                {
-                    using var connection = new AdomdConnection(_connectionString);
-                    ReferenceTables["columnsQuery"] = ExecuteDataTable("SELECT DISTINCT [TableID], [ExplicitName], [InferredName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
-                    ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], connection);
-                }
-                finally { semaphoreReferenceTables.Release(); }
-            }));
-
-            tasksReferenceTables.Add(Task.Run(async () =>
-            {
-                await semaphoreReferenceTables.WaitAsync(); try
-                {
-                    using var connection = new AdomdConnection(_connectionString);
-                    ReferenceTables["measureListSQLQuery"] = ExecuteDataTable("SELECT [MEASURE_NAME],[MEASUREGROUP_NAME],[EXPRESSION],[CUBE_NAME] FROM $SYSTEM.MDSCHEMA_MEASURES WHERE MEASURE_IS_VISIBLE AND MEASUREGROUP_NAME <> 'Reporting Filters' ORDER BY [MEASUREGROUP_NAME]",
-                    ["Measure", "MeasureGroup", "Expression", "CubeName"], connection);
-                }
-                finally { semaphoreReferenceTables.Release(); }
-            }));
-
-            tasksReferenceTables.Add(Task.Run(async () =>
-            {
-                await semaphoreReferenceTables.WaitAsync(); try
-                {
-                    using var connection = new AdomdConnection(_connectionString);
-                    ReferenceTables["measureReferenceQuery"] = ExecuteDataTable("SELECT DISTINCT [Object], [Referenced_Table] FROM $SYSTEM.DISCOVER_CALC_DEPENDENCY WHERE [Object_Type] = 'MEASURE'",
-                    ["Measure", "Referenced_Table"], connection);
-                }
-                finally { semaphoreReferenceTables.Release(); }
-            }));
-
-            tasksReferenceTables.Add(Task.Run(async () =>
-            {
-                await semaphoreReferenceTables.WaitAsync(); try
-                {
-                    using var connection = new AdomdConnection(_connectionString);
-                    ReferenceTables["relationshipQuery"] = ExecuteDataTable("SELECT DISTINCT [FromTableID], [FromColumnID], [ToTableID], [ToColumnID] FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS WHERE [IsActive]",
-                    ["FromTableID", "FromColumnID", "ToTableID", "ToColumnID"], connection);
-                }
-                finally { semaphoreReferenceTables.Release(); }
-            }));
-
-            Console.WriteLine("Starting execution of the reference tables query.");
-            Task.WhenAll(tasksReferenceTables).Wait();
-            Console.WriteLine("All reference tables have been created.");
-            foreach (DataRow row in ReferenceTables["columnsQuery"].Rows) row["ColumnName"] = string.IsNullOrWhiteSpace(row["ColumnName"]?.ToString()) ? row["InferredColumnName"]?.ToString() : row["ColumnName"]?.ToString();
-            ReferenceTables["columnsQuery"].Columns.Remove("InferredColumnName");
-            var finalColumns = GetFinalColumns(ReferenceTables["tableQuery"], ReferenceTables["columnsQuery"]);
-            Console.WriteLine("Completed final column list.");
-            _allCombinations = GetAllCombination(ReferenceTables["measureListSQLQuery"], ReferenceTables["measureReferenceQuery"], ReferenceTables["relationshipQuery"], ReferenceTables["tableQuery"], finalColumns, ReferenceTables["columnsQuery"]);
-            if (_isPreviousRunResultsExist == 1)
-            {
-                _allCombinations = ConvertToDataTable(
-                    from row1 in _allCombinations.AsEnumerable()
-                    let matchingRows = _previousRunResults.AsEnumerable().Where(row => row.Field<string>("Query") == row1.Field<string>("Query")).Take(1)
-                    from row2 in matchingRows.DefaultIfEmpty()
-                    select new
+                    await semaphoreReferenceTables.WaitAsync(); try
                     {
-                        UniqueID = row1.Field<int>("UniqueID"),
-                        Measure = row1.Field<string>("Measure"),
-                        DimensionName = row1.Field<string>("DimensionName"),
-                        ColumnName = row1.Field<string>("ColumnName"),
-                        LoadTime = row1.Field<string>("LoadTime"),
-                        PreviousLoadTime = row2?.Field<string>("LoadTime") ?? "0",
-                        isMeasureUsedInVisual = row1.Field<string>("isMeasureUsedInVisual"),
-                        ReportName = row1.Field<string>("ReportName"),
-                        PageName = row1.Field<string>("PageName"),
-                        VisualName = row1.Field<string>("VisualName"),
-                        VisualTitle = row1.Field<string>("VisualTitle"),
-                        Query = row1.Field<string>("Query"),
-                        hasDimension = row1.Field<string>("hasDimension")
+                        using var connection = new AdomdConnection(_connectionString);
+                        ReferenceTables["tableQuery"] = ExecuteDataTable("SELECT DISTINCT [Name], [ID] FROM $SYSTEM.TMSCHEMA_TABLES",
+                        ["TableName", "TableID"], connection);
                     }
-                );
+                    finally { semaphoreReferenceTables.Release(); }
+                }));
+
+                tasksReferenceTables.Add(Task.Run(async () =>
+                {
+                    await semaphoreReferenceTables.WaitAsync(); try
+                    {
+                        using var connection = new AdomdConnection(_connectionString);
+                        ReferenceTables["columnsQuery"] = ExecuteDataTable("SELECT DISTINCT [TableID], [ExplicitName], [InferredName], [ID] FROM $SYSTEM.TMSCHEMA_COLUMNS WHERE [Type] <> 3 AND NOT [IsDefaultImage] AND [State] = 1",
+                        ["TableID", "ColumnName", "InferredColumnName", "ColumnID"], connection);
+                    }
+                    finally { semaphoreReferenceTables.Release(); }
+                }));
+
+                tasksReferenceTables.Add(Task.Run(async () =>
+                {
+                    await semaphoreReferenceTables.WaitAsync(); try
+                    {
+                        using var connection = new AdomdConnection(_connectionString);
+                        ReferenceTables["measureListSQLQuery"] = ExecuteDataTable("SELECT [MEASURE_NAME],[MEASUREGROUP_NAME],[EXPRESSION],[CUBE_NAME] FROM $SYSTEM.MDSCHEMA_MEASURES WHERE MEASURE_IS_VISIBLE AND MEASUREGROUP_NAME <> 'Reporting Filters' ORDER BY [MEASUREGROUP_NAME]",
+                        ["Measure", "MeasureGroup", "Expression", "CubeName"], connection);
+                    }
+                    finally { semaphoreReferenceTables.Release(); }
+                }));
+
+                tasksReferenceTables.Add(Task.Run(async () =>
+                {
+                    await semaphoreReferenceTables.WaitAsync(); try
+                    {
+                        using var connection = new AdomdConnection(_connectionString);
+                        ReferenceTables["measureReferenceQuery"] = ExecuteDataTable("SELECT DISTINCT [Object], [Referenced_Table] FROM $SYSTEM.DISCOVER_CALC_DEPENDENCY WHERE [Object_Type] = 'MEASURE'",
+                        ["Measure", "Referenced_Table"], connection);
+                    }
+                    finally { semaphoreReferenceTables.Release(); }
+                }));
+
+                tasksReferenceTables.Add(Task.Run(async () =>
+                {
+                    await semaphoreReferenceTables.WaitAsync(); try
+                    {
+                        using var connection = new AdomdConnection(_connectionString);
+                        ReferenceTables["relationshipQuery"] = ExecuteDataTable("SELECT DISTINCT [FromTableID], [FromColumnID], [ToTableID], [ToColumnID] FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS WHERE [IsActive]",
+                        ["FromTableID", "FromColumnID", "ToTableID", "ToColumnID"], connection);
+                    }
+                    finally { semaphoreReferenceTables.Release(); }
+                }));
+
+                Console.WriteLine("Starting execution of the reference tables query.");
+                Task.WhenAll(tasksReferenceTables).Wait();
+                Console.WriteLine("All reference tables have been created.");
+                foreach (DataRow row in ReferenceTables["columnsQuery"].Rows) row["ColumnName"] = string.IsNullOrWhiteSpace(row["ColumnName"]?.ToString()) ? row["InferredColumnName"]?.ToString() : row["ColumnName"]?.ToString();
+                ReferenceTables["columnsQuery"].Columns.Remove("InferredColumnName");
+                var finalColumns = GetFinalColumns(ReferenceTables["tableQuery"], ReferenceTables["columnsQuery"]);
+                Console.WriteLine("Completed final column list.");
+                _allCombinations = GetAllCombination(ReferenceTables["measureListSQLQuery"], ReferenceTables["measureReferenceQuery"], ReferenceTables["relationshipQuery"], ReferenceTables["tableQuery"], finalColumns, ReferenceTables["columnsQuery"]);
+                if (_isPreviousRunResultsExist == 1)
+                {
+                    _allCombinations = ConvertToDataTable(
+                        from row1 in _allCombinations.AsEnumerable()
+                        let matchingRows = _previousRunResults.AsEnumerable().Where(row => row.Field<string>("Query") == row1.Field<string>("Query")).Take(1)
+                        from row2 in matchingRows.DefaultIfEmpty()
+                        select new
+                        {
+                            UniqueID = row1.Field<int>("UniqueID"),
+                            Measure = row1.Field<string>("Measure"),
+                            DimensionName = row1.Field<string>("DimensionName"),
+                            ColumnName = row1.Field<string>("ColumnName"),
+                            LoadTime = row1.Field<string>("LoadTime"),
+                            PreviousLoadTime = row2?.Field<string>("LoadTime") ?? "0",
+                            isMeasureUsedInVisual = row1.Field<string>("isMeasureUsedInVisual"),
+                            ReportName = row1.Field<string>("ReportName"),
+                            PageName = row1.Field<string>("PageName"),
+                            VisualName = row1.Field<string>("VisualName"),
+                            VisualTitle = row1.Field<string>("VisualTitle"),
+                            Query = row1.Field<string>("Query"),
+                            hasDimension = row1.Field<string>("hasDimension")
+                        }
+                    );
+                }
+                Console.WriteLine("Generated all possible combinations.");
+
+                Task.Run(() => ExecuteAllQuery(_allCombinations));
+                Console.WriteLine("Starting execution of the all combinations query.");
+
+                var jsonResult = _allCombinations.AsEnumerable().Select(row => new
+                {
+                    UniqueID = row["UniqueID"],
+                    Measure = row["Measure"],
+                    DimensionName = row["DimensionName"],
+                    ColumnName = row["ColumnName"],
+                    LoadTime = row["LoadTime"],
+                    PreviousLoadTime = row["PreviousLoadTime"],
+                    isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
+                    ReportName = row["ReportName"],
+                    PageName = row["PageName"],
+                    VisualName = row["VisualName"],
+                    VisualTitle = row["VisualTitle"],
+                    Query = row["Query"],
+                    hasDimension = row["hasDimension"]
+                });
+
+                Dictionary<string, Object> response = new() { { "results", jsonResult } };
+                return Ok(response);
             }
-            Console.WriteLine("Generated all possible combinations.");
-
-            Task.Run(() => ExecuteAllQuery(_allCombinations));
-            Console.WriteLine("Starting execution of the all combinations query.");
-
-            var jsonResult = _allCombinations.AsEnumerable().Select(row => new
+            catch (Exception ex)
             {
-                UniqueID = row["UniqueID"],
-                Measure = row["Measure"],
-                DimensionName = row["DimensionName"],
-                ColumnName = row["ColumnName"],
-                LoadTime = row["LoadTime"],
-                PreviousLoadTime = row["PreviousLoadTime"],
-                isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
-                ReportName = row["ReportName"],
-                PageName = row["PageName"],
-                VisualName = row["VisualName"],
-                VisualTitle = row["VisualTitle"],
-                Query = row["Query"],
-                hasDimension = row["hasDimension"]
-            });
-
-            Dictionary<string, Object> response = new() { { "results", jsonResult } };
-            return Ok(response);
+                Dictionary<string, string> response = new() { { "Error", $"{ex.Message}" } };
+                return Ok(response);
+            }
         }
 
         [HttpGet("progressBar")]
@@ -225,36 +254,52 @@ namespace MetricLoadTime.Server.Controllers
         [HttpGet("getloadtime")]
         public IActionResult GetLoadTime()
         {
-            var jsonResult = _allCombinations.AsEnumerable().Select(row => new
+            try
             {
-                UniqueID = row["UniqueID"],
-                Measure = row["Measure"],
-                DimensionName = row["DimensionName"],
-                ColumnName = row["ColumnName"],
-                LoadTime = row["LoadTime"],
-                PreviousLoadTime = row["PreviousLoadTime"],
-                isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
-                ReportName = row["ReportName"],
-                PageName = row["PageName"],
-                VisualName = row["VisualName"],
-                VisualTitle = row["VisualTitle"],
-                Query = row["Query"],
-                hasDimension = row["hasDimension"]
-            });
+                var jsonResult = _allCombinations.AsEnumerable().Select(row => new
+                {
+                    UniqueID = row["UniqueID"],
+                    Measure = row["Measure"],
+                    DimensionName = row["DimensionName"],
+                    ColumnName = row["ColumnName"],
+                    LoadTime = row["LoadTime"],
+                    PreviousLoadTime = row["PreviousLoadTime"],
+                    isMeasureUsedInVisual = row["isMeasureUsedInVisual"],
+                    ReportName = row["ReportName"],
+                    PageName = row["PageName"],
+                    VisualName = row["VisualName"],
+                    VisualTitle = row["VisualTitle"],
+                    Query = row["Query"],
+                    hasDimension = row["hasDimension"]
+                });
 
-            // Dictionary<string, Object> response = new() { { "results", jsonResult } };
-            return Ok(jsonResult);
+                // Dictionary<string, Object> response = new() { { "results", jsonResult } };
+                return Ok(jsonResult);
+            }
+            catch (Exception ex)
+            {
+                Dictionary<string, string> response = new() { { "Error", $"{ex.Message}" } };
+                return Ok(response);
+            }
         }
 
         [HttpPost("reload")]
         public IActionResult Reload([FromBody] ReloadRequest request)
         {
-            foreach (int UniqueID in request.ReloadQuries.Keys.ToArray())
+            try
             {
-                _allCombinations.Rows[UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[UniqueID - 1]["LoadTime"];
+                foreach (int UniqueID in request.ReloadQuries.Keys.ToArray())
+                {
+                    _allCombinations.Rows[UniqueID - 1]["PreviousLoadTime"] = _allCombinations.Rows[UniqueID - 1]["LoadTime"];
+                }
+                ExecuteAllQuery(_allCombinations, request.ReloadQuries);
+                return Ok(1);
             }
-            ExecuteAllQuery(_allCombinations, request.ReloadQuries);
-            return Ok(1);
+            catch (Exception ex)
+            {
+                Dictionary<string, string> response = new() { { "Error", $"{ex.Message}" } };
+                return Ok(response);
+            }
         }
 
         void ExecuteAllQuery(DataTable allQueries, Dictionary<int, string> reload = null)
@@ -581,7 +626,7 @@ namespace MetricLoadTime.Server.Controllers
                 }
                 _previousRunResults = dt;
                 _isPreviousRunResultsExist = 1;
-                CreateExcelSheet(dt, $"{_downloadFolderPath}\\MetricLoadTime\\{_modelName}\\Test\\{_reportName}.xlsx");
+                CreateExcelSheet(dt, $"{_downloadFolderPath}\\MetricLoadTime\\{_modelName}\\ParsedReport\\{_reportName}.xlsx");
             }
             Console.WriteLine($"The report {_reportName} has been parsed.");
             return dataTable;
