@@ -97,13 +97,13 @@ namespace MetricLoadTime.Server.Controllers
                 // _connectionString = "Provider=MSOLAP.8;Data Source=" + _endPoint + ";initial catalog=" + _modelName + ";UID=;PWD=";
 
                 Dictionary<string, DataTable> ReferenceTables = new()
-            {
-            {"tableQuery", null},
-            {"columnsQuery", null},
-            {"measureListSQLQuery", null},
-            {"measureReferenceQuery", null},
-            {"relationshipQuery", null}
-            };
+                    {
+                    {"tableQuery", null},
+                    {"columnsQuery", null},
+                    {"measureListSQLQuery", null},
+                    {"measureReferenceQuery", null},
+                    {"relationshipQuery", null}
+                    };
 
                 var semaphoreReferenceTables = new SemaphoreSlim(5);
                 List<Task> tasksReferenceTables = [];
