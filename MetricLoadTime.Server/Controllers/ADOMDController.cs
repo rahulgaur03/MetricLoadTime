@@ -559,10 +559,29 @@ namespace MetricLoadTime.Server.Controllers
                 using ExcelPackage package = new(new System.IO.FileInfo(_filePathpreviousRunResults));
                 var ws = package.Workbook.Worksheets[0];
                 var dt = new DataTable();
-                foreach (var firstRowCell in ws.Cells[1, 1, 1, ws.Dimension.End.Column]) dt.Columns.Add(firstRowCell.Text.Trim());
-                for (int rowNum = 2; rowNum <= ws.Dimension.End.Row; rowNum++) dt.Rows.Add(ws.Cells[rowNum, 1, rowNum, ws.Dimension.End.Column].Select(cell => cell.Text.Trim()).ToArray());
+                var columnCount = ws.Dimension.End.Column;
+                var rowCount = ws.Dimension.End.Row;
+
+                // Add columns to the DataTable
+                foreach (var firstRowCell in ws.Cells[1, 1, 1, columnCount])
+                {
+                    dt.Columns.Add(firstRowCell.Text.Trim());
+                }
+
+                // Add rows to the DataTable
+                for (int rowNum = 2; rowNum <= rowCount; rowNum++)
+                {
+                    var row = dt.NewRow();
+                    for (int colNum = 1; colNum <= columnCount; colNum++)
+                    {
+                        var cell = ws.Cells[rowNum, colNum];
+                        row[colNum - 1] = cell.Text.Trim();
+                    }
+                    dt.Rows.Add(row);
+                }
                 _previousRunResults = dt;
                 _isPreviousRunResultsExist = 1;
+                CreateExcelSheet(dt, $"{_downloadFolderPath}\\MetricLoadTime\\{_modelName}\\Test\\{_reportName}.xlsx");
             }
             Console.WriteLine($"The report {_reportName} has been parsed.");
             return dataTable;
