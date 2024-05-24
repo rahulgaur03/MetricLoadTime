@@ -14,7 +14,9 @@ import axios from "axios";
 import CircularProgress from '@mui/material/CircularProgress';
 
 
-const Example = ({combinations,initialcombinations,setinitialcombinations,genereatedLoadTimes,setGenereatedLoadTimes,rowSelection,setRowSelection, thresholdValue}) => {
+const Example = ({combinations,initialcombinations,setinitialcombinations,genereatedLoadTimes,setGenereatedLoadTimes,rowSelection,setRowSelection, thresholdValue, filteredData, setFilteredData}) => {
+
+  // console.log(initialcombinations)
 
   const intervalId = setInterval(async () => {
     try {
@@ -37,6 +39,8 @@ const Example = ({combinations,initialcombinations,setinitialcombinations,genere
             const generateCombinationsResponse = await generateCombinationsPromise;
             if (generateCombinationsResponse.ok) {
               generateCombinationsResponse.clone().json().then(results => setinitialcombinations(results));
+              setFilteredData(initialcombinations)
+              console.log(initialcombinations)
               clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
             } else {
               clearInterval(intervalId); // Stop polling if generateCombinationsPromise fails
@@ -67,8 +71,8 @@ const columns = useMemo(
       {
         accessorKey: 'loadTime',
         header: 'Load Time',
-        accessorFn: (originalRow) => (originalRow.loadTime > thresholdValue ? 'true' : 'false'), //must be strings
-        filterVariant: 'checkbox',
+        // accessorFn: (originalRow) => (originalRow.loadTime > thresholdValue ? 'true' : 'false'), //must be strings
+        // filterVariant: 'checkbox',
         Cell: ({ cell }) => ( 
           <Box
             sx={{
@@ -108,13 +112,13 @@ const columns = useMemo(
 
 
 
-  console.log(rowSelection)
+  // console.log(rowSelection)
 
 
   
   const table = useMaterialReactTable({
     columns,
-    data : initialcombinations,
+    data : filteredData,
     enableRowSelection: true,
     enableStickyHeader: true,
     enableColumnOrdering: true,
@@ -122,9 +126,9 @@ const columns = useMemo(
     state: { rowSelection }, 
     onRowSelectionChange: setRowSelection,
     initialState: { density: 'compact', showGlobalFilter: true},
-    positionGlobalFilter :"left",
+    positionGlobalFilter :"right",
     muiSearchTextFieldProps :{
-        placeholder: `Search ${initialcombinations.length} rows`,
+        placeholder: `Search ${filteredData.length} rows`,
         sx: { minWidth: '300px' },
         variant: 'outlined',
       }

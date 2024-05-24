@@ -7,9 +7,9 @@ import { TfiReload } from "react-icons/tfi";
 import { mkConfig, generateCsv, download } from "export-to-csv"; //or use your library of choice here
 import { IoRemoveOutline } from "react-icons/io5";
 import { Popover, Typography } from '@mui/material'
+import { IoFilterSharp } from "react-icons/io5";
 
-
-
+import Button from '@mui/material/Button';
 import axios from "axios";
 
 const TableComponent = ({filePathArray, combinations, modelName,thresholdValue, inputs }) => {
@@ -35,18 +35,17 @@ const [
 const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
   useState(false)
 
-  const handleClick = event => {
-    setAnchorEl(event.currentTarget)
-  }
+
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
 
   const handleClose = () => {
-    setAnchorEl(null)
-  }
+    setAnchorEl(null);
+  };
 
-  const open = Boolean(anchorEl)
-  const id = open ? 'simple-popover' : undefined
-
-
+  const open = Boolean(anchorEl);
+  const id = open ? 'simple-popover' : undefined;
 
 
 
@@ -132,6 +131,7 @@ const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
                     if (generateCombinationsResponse.ok) {
                         // console.log(generateCombinationsResponse.json())
                         generateCombinationsResponse.clone().json().then(results => setinitialcombinations(results));
+                        setFilteredData(initialcombinations)
                     } 
                 }
             }
@@ -152,33 +152,53 @@ const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
   const handlethresholdCheckboxChange = event => {
     setFilterthresholdCheckboxFlag(event.target.checked)
 
-    setFilteredData(
-      filteredData.filter(item => {
-        return !filterthresholdCheckboxFlag ? item.loadTime === (inputs.thresholdValue) : true
-      })
-    )
+    // setFilteredData(
+    //   filteredData.filter(item => {
+    //     return !filterthresholdCheckboxFlag ? item.loadTime === (inputs.thresholdValue) : true
+    //   })
+    // )
   }
 
   const handledimensionCheckboxChange = event => {
     setFilterdimensionCheckboxFlag(event.target.checked)
-    setFilteredData(
-      filteredData.filter(item => {
-        return !filterdimensionCheckboxFlag ? item.hasDimension === '1' : true
-      })
-    )
+    // setFilteredData(
+    //   filteredData.filter(item => {
+    //     return !filterdimensionCheckboxFlag ? item.hasDimension === '1' : true
+    //   })
+    // )
   }
 
 
 
   const handlevisualCheckboxChange = event => {
     setFiltervisualCheckboxFlag(event.target.checked)
-    setFilteredData(
-      filteredData.filter(item => {
-        return !filtervisualCheckboxFlag ? item.visualName !== '-' : true
-      })
-    )
+    // setFilteredData(
+    //   filteredData.filter(item => {
+    //     return !filtervisualCheckboxFlag ? item.visualName !== '-' : true
+    //   })
+    // )
   }
 
+
+  useEffect(() => {
+    const filterConditions = [
+      filterthresholdCheckboxFlag ? item => item.loadTime === inputs.thresholdValue : null,
+      filterdimensionCheckboxFlag ? item => item.hasDimension === '1' : null,
+      filtervisualCheckboxFlag ? item => item.visualName !== '-' : null
+    ].filter(Boolean); // Removes null conditions
+  
+    const filteredData = filterConditions.length
+      ? initialcombinations.filter(item => filterConditions.every(condition => condition(item)))
+      : initialcombinations;
+  
+    setFilteredData(filteredData);
+  }, [
+    filterthresholdCheckboxFlag, 
+    filterdimensionCheckboxFlag, 
+    filtervisualCheckboxFlag, 
+  ]);
+  
+  
 
   useEffect(() => {
     const countX = initialcombinations.filter(
@@ -190,335 +210,365 @@ const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
 
   console.log(combinations);
 
-  return (
-    <>
-      <div className="container mt-5 border">
-        <div
-          className="tabcontainer container mt-4 mx-3 mb-5 d-flex justify-content-between border-bottom"
-          style={{ width: "90%" }}
-        >
-          <div className="tabs d-flex">
-            <div className="summarymodel mx-1">
-              <button
-                type="button"
-                className={
-                  view === "summary"
-                    ? "btn inputselectedbutton"
-                    : "btn inputunselectedbutton"
-                }
-                onClick={() => setView("summary")}
-              >
-                Summary
-              </button>
+    return (
+      <>
+        <i className="icon list arrow left"
+        onClick={() => {
+          setBacktoinputflag(true)
+    }}>Back to Input Page</i>
+        <div className="container mt-5 border">
+          <div
+            className="tabcontainer container mt-4 mx-3 mb-5 d-flex justify-content-between border-bottom"
+            style={{ width: "90%" }}
+          >
+            <div className="tabs d-flex">
+              <div className="summarymodel mx-1">
+                <button
+                  type="button"
+                  className={
+                    view === "summary"
+                      ? "btn inputselectedbutton"
+                      : "btn inputunselectedbutton"
+                  }
+                  onClick={() => setView("summary")}
+                >
+                  Summary
+                </button>
+              </div>
+              <div className="detailmodel">
+                <button
+                  type="button"
+                  className={
+                    view === "detail"
+                      ? "btn inputselectedbutton"
+                      : "btn inputunselectedbutton"
+                  }
+                  onClick={() => setView("detail")}
+                >
+                  Details
+                </button>
+              </div>
             </div>
-            <div className="detailmodel">
-              <button
-                type="button"
-                className={
-                  view === "detail"
-                    ? "btn inputselectedbutton"
-                    : "btn inputunselectedbutton"
-                }
-                onClick={() => setView("detail")}
-              >
-                Details
-              </button>
-            </div>
+            {genereatedloadTimes != initialcombinations.length ? (
+              <div>
+                <b>
+                  <span style={{ color: "#A31619" }}>
+                    {genereatedloadTimes}/{initialcombinations.length}
+                  </span>{" "}
+                  Combinations Loaded
+                </b>
+              </div>
+            ) : (
+              ""
+            )}
+            {
+              view === "detail" ? (
+              <div className="d-flex">
+                <Button aria-describedby={id} variant="outlined" onClick={handleClick}className=" exportbtn" style = { {backgroundColor : "#f0f0f0", border : "none"}} >
+                  <IoFilterSharp />
+                </Button>
+                <Popover
+                  id={id}
+                  open={open}
+                  anchorEl={anchorEl}
+                  onClose={handleClose}
+                  anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                  }}
+                >
+                  <Typography sx={{ p: 2 }} className="d-flex flex-column">              
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={filterthresholdCheckboxFlag}
+                      onChange={handlethresholdCheckboxChange}
+                      className='mx-2'
+                    />
+                    Combinations Above Threshold
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={filterdimensionCheckboxFlag}
+                      onChange={handledimensionCheckboxChange}
+                      className='mx-2'
+                    />
+                    Combinations With Dimensions
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={filtervisualCheckboxFlag}
+                      onChange={handlevisualCheckboxChange}
+                      className='mx-2'
+                    />
+                    Combinations With Visuals
+                  </label></Typography>
+                </Popover>
+                <div className="export mx-1">
+                  <button
+                    type="button"
+                    className="exportbtn"
+                    onClick={handleExportData}
+                  >
+                    <b>
+                      <CgExport className="mx-1 mb-1" />
+                      Export
+                    </b>
+                  </button>
+                </div>
+                <div className="reload">
+                  <button
+                    type="button"
+                    className="exportbtn"
+                    onClick={handleReload}
+                  >
+                    <b>
+                      <TfiReload className="mx-2 mb-1" />
+                      Reload
+                    </b>
+                  </button>
+                </div>
+
+                
+                      
+              </div>
+              ) : ""
+            }
           </div>
-          {genereatedloadTimes != initialcombinations.length ? (
+          {view === "detail" ? (
             <div>
-              <b>
-                <span style={{ color: "#A31619" }}>
-                  {genereatedloadTimes}/{initialcombinations.length}
-                </span>{" "}
-                Combinations Loaded
-              </b>
+
+            {/* <Popover
+              id={id}
+              style={{ display: 'flex', flexDirection: 'row' }}
+              open={open}
+              anchorEl={anchorEl}
+              onClose={handleClose}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'left'
+              }}
+            > */}
+              {/* <div className='d-flex flex-column'>
+
+
+              </div> */}
+            {/* </Popover> */}
+
+            <Example
+              thresholdValue={inputs.thresholdValue}
+              combinations={combinations}
+              initialcombinations={initialcombinations}
+              filteredData = {filteredData}
+              setFilteredData={setFilteredData}
+              setinitialcombinations={setinitialcombinations}
+              genereatedloadTimes={genereatedloadTimes}
+              setGenereatedloadTimes={setGenereatedloadTimes}
+              rowSelection={rowSelection}
+              setRowSelection={setRowSelection}
+              />
             </div>
           ) : (
-            ""
-          )}
-          <div className="d-flex">
-            <div className="export mx-1">
-              <button
-                type="button"
-                className="exportbtn"
-                onClick={handleExportData}
-              >
-                <b>
-                  <CgExport className="mx-1 mb-1" />
-                  Export
-                </b>
-              </button>
-            </div>
-            <div className="reload">
-              <button
-                type="button"
-                className="exportbtn"
-                onClick={handleReload}
-              >
-                <b>
-                  <TfiReload className="mx-2 mb-1" />
-                  Reload
-                </b>
-              </button>
-            </div>
-            {/* <Popover
-          id={id}
-          style={{ display: 'flex', flexDirection: 'row' }}
-          open={open}
-          anchorEl={anchorEl}
-          onClose={handleClose}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'left'
-          }}
-        >
-          <Typography sx={{ p: 2 }} className='d-flex flex-column'> */}
-
-            <label>
-              <input
-                type="checkbox"
-                checked={filterthresholdCheckboxFlag}
-                onChange={handlethresholdCheckboxChange}
-                className='mx-2'
-              />
-              Above Threshold
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={filterdimensionCheckboxFlag}
-                onChange={handledimensionCheckboxChange}
-                className='mx-2'
-              />
-              Measure With Dimensions
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={filtervisualCheckboxFlag}
-                onChange={handlevisualCheckboxChange}
-                className='mx-2'
-              />
-              Measure With Visuals
-            </label>
-          {/* </Typography> */}
-        {/* </Popover> */}
-          </div>
-        </div>
-        {view === "detail" ? (
           <div>
+          <div className="usercardcontainer">
+            <div className="cards justify-content-evenly">
+              <div className="carD ">
+                <div
+                  className="card total_measures  rounded usercard"
+                  style={{ width: "1000px" }}
+                >
+                  <div className=" d-flex justify-content-between">
+                    <div className="d-flex">
+                      <IoRemoveOutline className="cardline" />
+                      <h6 className="card-text">
+                        <b>Model Name : </b>
+                      </h6>
+                    </div>
+                    <h6 className="card-text">
+                      <b>{inputs.modelName}</b>
+                    </h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="cards justify-content-evenly">
+              <div className="carD ">
+                <div
+                  className="card total_measures  rounded-0 usercard"
+                  style={{ width: "1000px" }}
+                >
+                  <div className=" d-flex justify-content-between">
+                    <div className="d-flex">
+                      <IoRemoveOutline className="cardline" />
+                      <h6 className="card-text">
+                        <b>Report Name : </b>
+                      </h6>
+                    </div>
+                      <h6 className="card-text">
+                      <b>{baseFileNames}</b>
+                    </h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="cards justify-content-evenly">
+              <div className="carD">
+                <div
+                  className="card total_measures  rounded-0 usercard "
+                  style={{ width: "1000px" }}
+                >
+                  <div className=" d-flex justify-content-between">
+                    <div className="d-flex">
+                      <IoRemoveOutline className="cardline" />
+                      <h6 className="card-text">
+                        <b>XMLA Endpoint : </b>
+                      </h6>
+                    </div>
+                    <h6 className="card-text">
+                      <b>{inputs.xmlaEndpoint}</b>
+                    </h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="cards justify-content-evenly">
+              <div className="carD ">
+                <div
+                  className="card total_measures  rounded-0 usercard"
+                  style={{ width: "1000px" }}
+                >
+                  <div className=" d-flex justify-content-between">
+                    <div className="d-flex">
+                      <IoRemoveOutline className="cardline" />
+                      <h6 className="card-text">
+                        <b>Threshold Value : </b>
+                      </h6>
+                    </div>
+                    <h6 className="card-text">
+                      <b>{thresholdValue}</b>
+                    </h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="cards">
+            <div className="carD px-5">
+              <div className="card total_measures  rounded-0 ">
+                <div className=" d-flex">
+                  <IoRemoveOutline className="cardline" />
 
-          <Example
-            thresholdValue={inputs.thresholdValue}
-            combinations={combinations}
-            initialcombinations={filteredData}
-            setinitialcombinations={setinitialcombinations}
-            genereatedloadTimes={genereatedloadTimes}
-            setGenereatedloadTimes={setGenereatedloadTimes}
-            rowSelection={rowSelection}
-            setRowSelection={setRowSelection}
-            />
-          </div>
-        ) : (
-        <div>
-        <div className="usercardcontainer">
-          <div className="cards justify-content-evenly">
-            <div className="carD ">
-              <div
-                className="card total_measures  rounded usercard"
-                style={{ width: "1000px" }}
-              >
-                <div className=" d-flex justify-content-between">
-                  <div className="d-flex">
-                    <IoRemoveOutline className="cardline" />
-                    <h6 className="card-text">
-                      <b>Model Name : </b>
-                    </h6>
-                  </div>
                   <h6 className="card-text">
-                    <b>{inputs.modelName}</b>
+                    <b>Total Measure Combination</b>
                   </h6>
+                  <h5 className="card-title mb-auto">
+                    {initialcombinations.length}
+                  </h5>
+                </div>
+              </div>
+            </div>
+
+            <div className="carD px-5">
+              <div className="card total_measures  rounded-0 ">
+                <div className=" d-flex">
+                  <IoRemoveOutline className="cardline" />
+
+                  <h6 className="card-text">
+                    <b>Combinations below threshold</b>
+                  </h6>
+                  <h5 className="card-title mb-auto">
+                    {
+                              initialcombinations
+                                .map((entry) => entry.loadTime)
+                                .filter((e) => e < thresholdValue).length
+                            }
+                  </h5>
+                </div>
+              </div>
+            </div>
+            <div className="carD px-5">
+              <div className="card total_measures  rounded-0 ">
+                <div className=" d-flex">
+                  <IoRemoveOutline className="cardline" />
+
+                  <h6 className="card-text">
+                    <b>Combinations above threshold</b>
+                  </h6>
+                  <h5 className="card-title mb-auto">
+                    {
+                              initialcombinations
+                                .map((entry) => entry.loadTime)
+                                .filter((e) => e === thresholdValue).length
+                            }
+                  </h5>
                 </div>
               </div>
             </div>
           </div>
-          <div className="cards justify-content-evenly">
-            <div className="carD ">
-              <div
-                className="card total_measures  rounded-0 usercard"
-                style={{ width: "1000px" }}
-              >
-                <div className=" d-flex justify-content-between">
-                  <div className="d-flex">
-                    <IoRemoveOutline className="cardline" />
-                    <h6 className="card-text">
-                      <b>Report Name : </b>
-                    </h6>
-                  </div>
-                    <h6 className="card-text">
-                    <b>{baseFileNames}</b>
+          <div className="cards">
+            <div className="carD px-5">
+              <div className="card total_measures  rounded-0 ">
+                <div className=" d-flex">
+                  <IoRemoveOutline className="cardline" />
+
+                  <h6 className="card-text">
+                    <b>Combinations From Report</b>
                   </h6>
+                  <h5 className="card-title mb-auto">
+                    {
+                              initialcombinations
+                                .map((entry) => entry.reportName)
+                                .filter((e) => e != "-").length
+                            }
+                  </h5>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="cards justify-content-evenly">
-            <div className="carD">
-              <div
-                className="card total_measures  rounded-0 usercard "
-                style={{ width: "1000px" }}
-              >
-                <div className=" d-flex justify-content-between">
-                  <div className="d-flex">
-                    <IoRemoveOutline className="cardline" />
-                    <h6 className="card-text">
-                      <b>XMLA Endpoint : </b>
-                    </h6>
-                  </div>
+
+            <div className="carD px-5">
+              <div className="card total_measures  rounded-0 ">
+                <div className=" d-flex">
+                  <IoRemoveOutline className="cardline" />
+
                   <h6 className="card-text">
-                    <b>{inputs.xmlaEndpoint}</b>
+                    <b>Combinations From Model</b>
                   </h6>
+                  <h5 className="card-title mb-auto">
+                    {
+                              initialcombinations
+                                .map((entry) => entry.reportName)
+                                .filter((e) => e === "-").length
+                            }
+                  </h5>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="cards justify-content-evenly">
-            <div className="carD ">
-              <div
-                className="card total_measures  rounded-0 usercard"
-                style={{ width: "1000px" }}
-              >
-                <div className=" d-flex justify-content-between">
-                  <div className="d-flex">
-                    <IoRemoveOutline className="cardline" />
-                    <h6 className="card-text">
-                      <b>Threshold Value : </b>
-                    </h6>
-                  </div>
+            <div className="carD px-5">
+              <div className="card total_measures  rounded-0 ">
+                <div className=" d-flex">
+                  <IoRemoveOutline className="cardline" />
+
                   <h6 className="card-text">
-                    <b>{thresholdValue}</b>
+                    <b>Combinations With Dimension</b>
                   </h6>
+                  <h5 className="card-title mb-auto">
+                    {
+                              initialcombinations
+                                .map((entry) => entry.reportName)
+                                .filter((e) => e === "-").length
+                            }
+                  </h5>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div className="cards">
-          <div className="carD px-5">
-            <div className="card total_measures  rounded-0 ">
-              <div className=" d-flex">
-                <IoRemoveOutline className="cardline" />
-
-                <h6 className="card-text">
-                  <b>Total Measure Combination</b>
-                </h6>
-                <h5 className="card-title mb-auto">
-                  {initialcombinations.length}
-                </h5>
-              </div>
-            </div>
-          </div>
-
-          <div className="carD px-5">
-            <div className="card total_measures  rounded-0 ">
-              <div className=" d-flex">
-                <IoRemoveOutline className="cardline" />
-
-                <h6 className="card-text">
-                  <b>Combinations below threshold</b>
-                </h6>
-                <h5 className="card-title mb-auto">
-                  {
-                            initialcombinations
-                              .map((entry) => entry.loadTime)
-                              .filter((e) => e < thresholdValue).length
-                          }
-                </h5>
-              </div>
-            </div>
-          </div>
-          <div className="carD px-5">
-            <div className="card total_measures  rounded-0 ">
-              <div className=" d-flex">
-                <IoRemoveOutline className="cardline" />
-
-                <h6 className="card-text">
-                  <b>Combinations above threshold</b>
-                </h6>
-                <h5 className="card-title mb-auto">
-                  {
-                            initialcombinations
-                              .map((entry) => entry.loadTime)
-                              .filter((e) => e === thresholdValue).length
-                          }
-                </h5>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
-        <div className="cards">
-          <div className="carD px-5">
-            <div className="card total_measures  rounded-0 ">
-              <div className=" d-flex">
-                <IoRemoveOutline className="cardline" />
-
-                <h6 className="card-text">
-                  <b>Combinations From Report</b>
-                </h6>
-                <h5 className="card-title mb-auto">
-                  {
-                            initialcombinations
-                              .map((entry) => entry.reportName)
-                              .filter((e) => e != "-").length
-                          }
-                </h5>
-              </div>
-            </div>
-          </div>
-
-          <div className="carD px-5">
-            <div className="card total_measures  rounded-0 ">
-              <div className=" d-flex">
-                <IoRemoveOutline className="cardline" />
-
-                <h6 className="card-text">
-                  <b>Combinations From Model</b>
-                </h6>
-                <h5 className="card-title mb-auto">
-                  {
-                            initialcombinations
-                              .map((entry) => entry.reportName)
-                              .filter((e) => e === "-").length
-                          }
-                </h5>
-              </div>
-            </div>
-          </div>
-          <div className="carD px-5">
-            <div className="card total_measures  rounded-0 ">
-              <div className=" d-flex">
-                <IoRemoveOutline className="cardline" />
-
-                <h6 className="card-text">
-                  <b>Combinations With Dimension</b>
-                </h6>
-                <h5 className="card-title mb-auto">
-                  {
-                            initialcombinations
-                              .map((entry) => entry.reportName)
-                              .filter((e) => e === "-").length
-                          }
-                </h5>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-        )}
-      </div>
-    </>
-  );
+      </>
+    );
 };
 
 export default TableComponent;
