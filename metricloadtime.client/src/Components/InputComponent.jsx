@@ -301,7 +301,7 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
             />
           </div>
 
-          <div className="runningforfirsttimeinput d-flex mt-2">
+          {/* <div className="runningforfirsttimeinput d-flex mt-2">
             <label className="runningforfirsttime fs-5 fw-bold mt-2">Running for First Time</label>
             <input
               type="checkbox"
@@ -310,7 +310,7 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
               checked={inputs.runningForFirstTime}
               onChange={handleInputChange}
             />
-          </div>
+          </div> */}
         </div>
 
         <div className="buttoncontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
