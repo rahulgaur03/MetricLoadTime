@@ -82,6 +82,7 @@ namespace MetricLoadTime.Server.Controllers
             }
             catch (Exception ex)
             {
+                Console.WriteLine(ex.Message);
                 Dictionary<string, string> response = new() { { "Error", $"{ex.Message}" } };
                 return Ok(response);
             }
@@ -222,6 +223,7 @@ namespace MetricLoadTime.Server.Controllers
             }
             catch (Exception ex)
             {
+                Console.WriteLine(ex.Message);
                 Dictionary<string, string> response = new() { { "Error", $"{ex.Message}" } };
                 return Ok(response);
             }
@@ -278,6 +280,7 @@ namespace MetricLoadTime.Server.Controllers
             }
             catch (Exception ex)
             {
+                Console.WriteLine(ex.Message);
                 Dictionary<string, string> response = new() { { "Error", $"{ex.Message}" } };
                 return Ok(response);
             }
@@ -297,6 +300,7 @@ namespace MetricLoadTime.Server.Controllers
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"{ex.Message}");
                 Dictionary<string, string> response = new() { { "Error", $"{ex.Message}" } };
                 return Ok(response);
             }
@@ -321,7 +325,9 @@ namespace MetricLoadTime.Server.Controllers
                         using var connection = new AdomdConnection(_connectionString);
                         GetQueryExecutionTime(query, rowIndex, allQueries, connection);
                     }
-                    catch { }
+                    catch (Exception ex){
+                        Console.WriteLine($"{ex.Message}");
+                    }
                     finally
                     {
                         semaphore.Release();
@@ -430,11 +436,11 @@ namespace MetricLoadTime.Server.Controllers
                         _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
                         Console.WriteLine(rowIndex + " " + _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"] + ")");
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         _allColumnCount.Rows[rowIndex]["Count"] = int.MaxValue;
                         _allColumnCount.Rows[rowIndex]["ProgressStatus"] = 1;
-                        Console.WriteLine("Failed !!! " + rowIndex + " " + _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"] + ")");
+                        Console.WriteLine("Failed !!! " + rowIndex + " " + _allColumnCount.Rows[rowIndex]["ColumnName"] + " (RowCount:" + _allColumnCount.Rows[rowIndex]["Count"] + ") " + ex.Message);
                     }
                     finally
                     {
