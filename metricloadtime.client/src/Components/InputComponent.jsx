@@ -6,7 +6,7 @@ import Select from 'react-select';
 
 import Modal from 'react-bootstrap/Modal';
 
-const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath, setCombinations, inputs, setInputs }) => {
+const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath, setCombinations, inputs,setInputs }) => {
 
 
   const [model, setModel] = useState('powerbi');
@@ -22,11 +22,11 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
 
   const handleFileAddButtonClick = () => {
     if (filePath.trim() !== '') {
-      setDisplayedfile([...displayedfile, filePath]);
-      setFilePath('');
-      let filearray = filePathArray
-      filearray.push(filePath)
-      setFilePathArray(filearray)
+        setDisplayedfile([...displayedfile, filePath]);
+        setFilePath(''); 
+        let filearray = filePathArray
+        filearray.push(filePath)
+        setFilePathArray(filearray)
     }
   };
 
@@ -73,7 +73,7 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
   };
 
   const handleRemoveFile = (event) => {
-    let file = event.target.innerText.slice(0, -2).concat(".pbix")
+    let file = event.target.innerText.slice(0,-2).concat(".pbix")
     // console.log(file)
     // console.log(filePathArray)
     // filePathArray.forEach(element => {
@@ -82,7 +82,7 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
     //   }
     // });
     let filteredPathArray = filePathArray.filter(path => !path.endsWith(file));
-    let fileteredFileArray = displayedfile.filter(function (e) { return e !== event.target.innerText.slice(0, -2) })
+    let fileteredFileArray = displayedfile.filter(function(e) { return e !== event.target.innerText.slice(0,-2) })
     setFilePathArray(filteredPathArray)
     console.log(displayedfile)
     // setDisplayedfile(fileteredFileArray)
@@ -126,7 +126,7 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
 
 
   const login = async () => {
-    let generateCombinationsPromise;
+    let generateCombinationsPromise; 
     try {
       const requestBody = {
         Username: String(email),
@@ -177,7 +177,7 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
       } catch (error) {
         console.error(error);
       }
-    }, 2000);
+    }, 2000); 
   };
   const hasInputValues = Object.values(inputs).some(value => value !== '');
 
@@ -185,11 +185,6 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
 
   return (
     <>
-      <nav className="navbar bg-body-tertiary">
-        <div className="container-fluid mx-5">
-          <a className="navbar-brand mx-5">Metric Load Time Tool</a>
-        </div>
-      </nav>
 
       <div className="container mt-5 border">
         <div className="innercontainer modeltabcontainer container mt-4 mx-3 mb-5" style={{ width: '90%' }}>
@@ -210,29 +205,29 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
         <div className="inputs container mx-5 mr-3" style={{ width: '85%' }}>
           <div className="filepathinput d-flex flex-column">
             <label className="filepath fs-5 fw-bold mt-2">File Path</label>
-            <div className='d-flex'>
+            <div className = 'd-flex'>
               <input
                 type="text"
                 name="filePath"
                 className="mt-2"
-                style={{ height: '40px', width: "-webkit-fill-available" }}
+                style={{ height: '40px', width : "-webkit-fill-available" }}
                 value={filePath}
                 onChange={handleFileInputChange}
                 placeholder="Enter File Path"
               />
-              <button onClick={handleFileAddButtonClick} style={{ height: '40px', color: "white", backgroundColor: "#A31619", border: "none" }} className='mt-2'>
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-plus" viewBox="0 0 16 16">
-                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4" />
-                </svg>
+              <button onClick={handleFileAddButtonClick} style={{height: '40px', color : "white", backgroundColor : "#A31619", border:"none"}} className='mt-2'>
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-plus" viewBox="0 0 16 16">
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
+              </svg>
               </button>
             </div>
           </div>
           <div>
-            {displayedfile.map((value, index) => (
-              <button key={index} type="button" class="close" aria-label="Close" onClick={handleRemoveFile}>
-                <span aria-hidden="true"> {value.replace(/^.*[\\/]/, '').replace(/\..*$/, '')} &times;</span>
-              </button>
-            ))}
+          {displayedfile.map((value, index) => (
+                  <button key={index} type="button" class="close" aria-label="Close" onClick={handleRemoveFile}>
+                    <span aria-hidden="true"> {value.replace(/^.*[\\/]/, '').replace(/\..*$/, '')} &times;</span>
+                </button>
+                ))}
           </div>
 
           {model === 'tabular' && (
@@ -322,7 +317,7 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
           <div className="tabs d-flex justify-content-end">
             <div className="powerbimodel">
               <button type="button" className="resetbutton btn" onClick={() => handleResetClick()}>
-                ↻ Reset
+              ↻ Reset
               </button>
             </div>
             <div className="tabularmodel mx-1">
@@ -368,8 +363,8 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
                         <div className="progress-bar progress-bar-striped bg-danger progress-bar-animated" style={{ width: (progress.Progress / progress.Total) * 100 + "%" }}></div>
                       </div>
                       <div className='align-self-center'>
-                        <b> <span style={{ color: "#A31619" }}>
-                          {parseInt((progress.Progress / progress.Total) * 100)}% </span> Completed</b>
+                        <b> <span style={{color : "#A31619"}}>
+                         {parseInt((progress.Progress / progress.Total) * 100)}% </span> Completed</b>
                       </div>
                     </div>
                   }
@@ -400,7 +395,7 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
                       <label for="exampleInputPassword1" class="form-label">Password</label>
                       <input type="password" class="form-control" id="exampleInputPassword1" onChange={handlepassword} />
                     </div>
-                    <button type="submit" class="btn btn-primary" style={{ backgroundColor: "#A31619" }} onClick={login} >Log In</button>
+                    <button type="submit" class="btn btn-primary" style={{backgroundColor : "#A31619"}} onClick={login} >Log In</button>
                   </div>
                 </Modal.Body>
                 <Modal.Footer>
