@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 // import Button from 'react-bootstrap/Button'; 
 import axios from 'axios';
-import Select from 'react-select';
 
 import Modal from 'react-bootstrap/Modal';
 
@@ -134,7 +133,6 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
       };
 
 
-      console.log(requestBody)
 
       generateCombinationsPromise = fetch('api/adomd/progress', {
         method: 'POST',
@@ -160,18 +158,63 @@ const InputComponent = ({ filePathArray, setFilePathArray, filePath, setFilePath
         }
         const progressData = await progressResponse.json();
         console.log(progressData);
+        console.log("here1")
         setProgress(progressData);
 
+        // if (generateCombinationsPromise) {
+        //   const generateCombinationsResponse = await generateCombinationsPromise;
+        //   if (generateCombinationsResponse.ok) {
+        //     // console.log(generateCombinationsResponse.json())
+        //     generateCombinationsResponse.clone().json().then(results => setCombinations(results));
+        //     setPopoverVisible(false)
+        //     setprogressPopoverVisible(false);
+        //     clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
+        //   } else {
+        //     clearInterval(intervalId); // Stop polling if generateCombinationsPromise fails
+        //   }
+        // }
         if (generateCombinationsPromise) {
           const generateCombinationsResponse = await generateCombinationsPromise;
+          console.log("here2")
+
+          // Handle successful login response
           if (generateCombinationsResponse.ok) {
-            // console.log(generateCombinationsResponse.json())
-            generateCombinationsResponse.clone().json().then(results => setCombinations(results));
-            setPopoverVisible(false)
+            const results = await generateCombinationsResponse.json();
+            console.log("here3")
+            console.log(results)
+            if(results.Error){
+              let headersList = {
+                "Content-Type": "application/json"
+               }
+               
+             
+               let response = await fetch("http://localhost:8001/api/adomd/rerun", { 
+                 method: "GET",
+                 headers: headersList
+               });
+               
+               let data = await response.text();
+               console.log(data);
+               alert(results.Error)
+               window.location.reload(); // Reload the page
+            }
+
+
+            setCombinations(results);
+            setPopoverVisible(false);
             setprogressPopoverVisible(false);
-            clearInterval(intervalId); // Stop polling if generateCombinationsPromise is resolved
+            clearInterval(intervalId);
           } else {
-            clearInterval(intervalId); // Stop polling if generateCombinationsPromise fails
+            // Handle login error response
+            console.log("here4")
+            const errorData = await generateCombinationsResponse.json();
+            if (errorData.Error) { // Check for existence of "error" field
+              alert('Login Error: ' + errorData.error);
+              window.location.reload(); // Reload the page
+            } else {
+              console.error('Unexpected login error format:', errorData);
+            }
+            clearInterval(intervalId);
           }
         }
       } catch (error) {

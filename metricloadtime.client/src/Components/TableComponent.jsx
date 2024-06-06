@@ -11,6 +11,8 @@ import { IoFilterSharp } from "react-icons/io5";
 
 import Button from '@mui/material/Button';
 import axios from "axios";
+import MainComponent from "../MainComponent";
+import { useStaticPicker } from "@mui/x-date-pickers/internals";
 
 const TableComponent = ({filePathArray, combinations, modelName,thresholdValue, inputs }) => {
   const [view, setView] = useState("detail");
@@ -197,25 +199,38 @@ const [filtervisualCheckboxFlag, setFiltervisualCheckboxFlag] =
     filterdimensionCheckboxFlag, 
     filtervisualCheckboxFlag, 
   ]);
-  
-  
+
+
+  const [flag, setFlag] = useState(0)
+
 
   useEffect(() => {
     const countX = initialcombinations.filter(
       (obj) => obj.loadTime != "x"
     ).length;
     setGenereatedloadTimes(countX);
+    setFlag(1)
+    
   }, [initialcombinations]);
-
 
   console.log(combinations);
 
     return (
       <>
+
+        <nav className="navbar bg-body-tertiary">
+          <div className="container-fluid mx-5">
+            <a className="navbar-brand mx-5">Metric Load Time Tool</a>
+          </div>
+        </nav>
+
+        <button className="btn inputselectedbutton"
+          onClick={handlebackbutton}>&lt; Back to Input Page</button>
         <i className="icon list arrow left"
         onClick={() => {
           setBacktoinputflag(true)
     }}>Back to Input Page</i>
+
         <div className="container mt-5 border">
           <div
             className="tabcontainer container mt-4 mx-3 mb-5 d-flex justify-content-between border-bottom"
