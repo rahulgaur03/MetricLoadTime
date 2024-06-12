@@ -65,7 +65,15 @@ const TableComponent = ({ filePathArray, combinations, modelName, thresholdValue
 
 
   const handleExportData = () => {
-    const csv = generateCsv(csvConfig)(initialcombinations);
+    // console.log(initialcombinations)
+    let copiedArray = initialcombinations.map(item => {
+      // Create a shallow copy of the object
+      const newItem = { ...item };
+      // Delete the 'queries' key
+      delete newItem.query;
+      return newItem;
+    });
+    const csv = generateCsv(csvConfig)(copiedArray);
     download(csvConfig)(csv);
   };
 
